@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/cmake_install.cmake",
+		"C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/_deps/sdl2-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
