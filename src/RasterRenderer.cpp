@@ -4,7 +4,7 @@
 #include <cmath>
 
 
-constexpr int SUPERSAMPLE_GRID = 3;
+constexpr int SUPERSAMPLE_GRID = 1;
 
 
 

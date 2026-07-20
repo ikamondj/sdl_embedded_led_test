@@ -235,47 +235,107 @@ ColorF eyeSample(
                 openingTime / OPEN_TIME);
     }
 
-    auto upperEye = [blink](float absoluteX) {
-        if (absoluteX < 0.5f || absoluteX > 1.0f) {
+    float blinkability = dlerp(
+            1.0f, 
+            0.0f, 
+            1.0f, 
+            0.0f, 
+            0.0f, 
+            input.joystick1.x, input.joystick1.y);
+
+    auto upperEye = [blink, input, blinkability](float absoluteX) {
+        
+        if (absoluteX < 0.4f || absoluteX > 1.0f) {
             return -5.0f;
         }
 
-        const float openUpper =
-            std::cbrt(
+        float defOpen = std::cbrt(
                 0.7f * absoluteX - 0.35f) -
             0.05f;
 
-        const float closedPosition =
+        float contenta = 1.97 * (absoluteX - .4f) * (absoluteX - .4f) - 0.05f;
+
+        const float sloffset = absoluteX - 0.7f;
+        const float sleepy = -3.0f * sqrtf(.09 - sloffset * sloffset) + .91f;
+
+        const float foffset = absoluteX - .75;
+        const float fullopen = 3.7f * sqrtf(.36-foffset*foffset) - 1.6f;
+
+        const float openUpper = dlerp(
+            defOpen, 
+            contenta, 
+            defOpen, 
+            fullopen, 
+            sleepy, input.joystick1.x, input.joystick1.y);
+            
+
+        const float flatBlink =
             1.4f * absoluteX-.75f;
 
-        return lerpFloat(
+        
+
+        float nonblinkables = openUpper;
+
+        float blinkables = lerpFloat(
             openUpper,
-            closedPosition,
+            flatBlink,
             blink);
+
+        return lerpFloat(
+            nonblinkables,
+            blinkables,
+            blinkability);
     };
 
-    auto lowerEye = [blink](float absoluteX) {
-        if (absoluteX < 0.5f || absoluteX > 1.0f) {
+    auto lowerEye = [blink, input, blinkability](float absoluteX) {
+        if (absoluteX > 1.0f) {
             return 5.0f;
+        }
+        if (absoluteX < 0.4f) {
+            return -.05f;
         }
 
         const float offset =
             absoluteX - 0.5f;
 
-        const float openLower =
+        const float defopen =
             5.6f *
                 offset *
                 offset *
                 offset -
             0.05f;
 
+        const float sloffset = absoluteX - 0.7f;
+        const float sleepy = -2.3f * sqrtf(.09 - sloffset * sloffset) + .65f;
+
+        const float foffset = absoluteX - .63;
+        const float fullopen = -2.0f * sqrtf(.16-foffset*foffset) + 0.71f;
+
         const float closedPosition =
             1.4f * absoluteX-.75f;
+        const float slimopen = lerpFloat(defopen, closedPosition, .77f);
+        
 
-        return lerpFloat(
+        const float openLower = dlerp(
+            defopen, 
+            defopen, 
+            slimopen,
+            fullopen, 
+            sleepy, input.joystick1.x, input.joystick1.y);
+
+        
+
+        float blinkables = lerpFloat(
             openLower,
             closedPosition,
             blink);
+
+        float nonblinkables = openLower;
+
+        return lerpFloat(
+            nonblinkables,
+            blinkables,
+            blinkability);
     };
 
     /*
@@ -300,17 +360,18 @@ ColorF eyeSample(
             originalY < upperEye(absoluteX);
     };
 
-    auto browPredicate = [blink](float x, float y) {
+    auto browPredicate = [blink, blinkability](float x, float y) {
+        float blinkz = blink * blinkability;
         bool inbotbrow = inTri(x,y,
-            .560f+blink*.15f, .391f-blink*.15f,
-            .500f+blink*.15f, .577f-blink*.15f,
-            .650f+blink*.15f, .510f-blink*.15f,
+            .560f+blinkz*.15f, .391f-blinkz*.15f,
+            .500f+blinkz*.15f, .577f-blinkz*.15f,
+            .650f+blinkz*.15f, .510f-blinkz*.15f,
             1.0f);
 
         bool intopbrow = inTri(x,y,
-            .713f+blink*.15f, .550f-blink*.15f,
-            .680f+blink*.15f, .680f-blink*.15f,
-            .840f+blink*.15f, .580f-blink*.15f,
+            .713f+blinkz*.15f, .550f-blinkz*.15f,
+            .680f+blinkz*.15f, .680f-blinkz*.15f,
+            .840f+blinkz*.15f, .580f-blinkz*.15f,
             1.0f);
 
         return inbotbrow || intopbrow;
@@ -319,13 +380,13 @@ ColorF eyeSample(
     /*
      * Joystick 1 moves all concentric eye circles together.
      */
-    const float pupilOffsetX =
-        EYE_HORIZONTAL_TRAVEL *
-        input.joystick1.x;
+    const float pupilOffsetX = 0;
+        //EYE_HORIZONTAL_TRAVEL *
+        //input.joystick1.x;
 
-    const float pupilOffsetY =
-        EYE_VERTICAL_TRAVEL *
-        input.joystick1.y+.15f;
+    const float pupilOffsetY = 0.15f;
+        //EYE_VERTICAL_TRAVEL *
+        //input.joystick1.y+.15f;
 
     const float leftCenterX =
         -EYE_SPACING + pupilOffsetX;
@@ -452,7 +513,8 @@ ColorF eyeSample(
 }
 
 float mouthWidth(const RenderInputs& input) {
-    return dlerp(.85f, .387298f, .85f, .85f, .85f, input.joystick2.x, input.joystick2.y);
+    return .85f;
+    //return dlerp(.85f, .387298f, .85f, .85f, .85f, input.joystick2.x, input.joystick2.y);
 }
 
 float mouthTop(float x, const RenderInputs& input) {
@@ -461,11 +523,15 @@ float mouthTop(float x, const RenderInputs& input) {
     if (abs(x) > mouthW) {
         return -5.0f;
     }
+    float openSmile = 0.7f*x*x*x*x-.55f;
+    float leftness = std::clamp(-input.joystick2.x, 0.0f, 1.0f);
+    float cx = x * (1-0.544355294118f*(1-leftness));
+    float circleMouth = sqrt(.15f-cx*cx)-.35f;
     return dlerp(
-        0.7f*x*x*x*x-.55f, 
-        sqrt(.15f-x*x)-.35f, 
+        openSmile, 
+        circleMouth, 
         -.5f, 
-        0.7f*x*x*x*x-.55f, 
+        openSmile, 
         -.5f, 
         input.joystick2.x, input.joystick2.y);
 }
@@ -476,21 +542,48 @@ float mouthBot(float x, const RenderInputs& input) {
     if (abs(x) > mouthW) {
         return 5.0f;
     }
+    
+    float closeSmile = 0.7f*x*x*x*x-.55f;
+    float openSmile = 1.1f*x*x*x*x-.75f;
+    float leftness = std::clamp(-input.joystick2.x, 0.0f, 1.0f);
+    float cx = x * (1-0.544355294118f*(1-leftness));
+    float circleMouth = -sqrt(.15f-cx*cx)-.35f;
     return dlerp(
-        1.1f*x*x*x*x-.75f, 
-        -sqrt(.15f-x*x)-.35f, 
+        openSmile, 
+        circleMouth, 
         -.5f, 
-        0.7f*x*x*x*x-.65f, 
+        closeSmile, 
         -.5f, input.joystick2.x, input.joystick2.y);
 }
 
 bool topTooth(float x, float y, float mouthTop, const RenderInputs& input) {
     x = abs(x);
+    float topLeftX = dlerp(.395f, .25f, .395f, .395f, .395f, input.joystick2.x, input.joystick2.y);
+    float topLeftY = dlerp(-.497f, -.018f, -.497f, -.497f, -.497f, input.joystick2.x, input.joystick2.y);
+    float topRightX = dlerp(.602f, .373f, .602f, .602f, .602f, input.joystick2.x, input.joystick2.y);
+    float topRightY = dlerp(-.420f, -.164f, -.420f, -.420f, -.420f, input.joystick2.x, input.joystick2.y);
+    float bottomX = dlerp(.500f, .174f, .500f, .500f, .500f, input.joystick2.x, input.joystick2.y);
+    float bottomY = dlerp(-.650f, -.251f, -.650f, -.650f, -.650f, input.joystick2.x, input.joystick2.y);
     return inTri(x,y,
-        .395f, -.497f,
-        .602f, -.420f,
-        .500f, -.650f,
-        0.1f) && y < mouthTop;
+        topLeftX, topLeftY,
+        topRightX, topRightY,
+        bottomX, bottomY,
+        0.1f) && y <= mouthTop;
+}
+
+bool bottomTooth(float x, float y, float mouthBot, float mouthTop, const RenderInputs& input) {
+    x = abs(x);
+    float botLeftX = dlerp(.22f, .173f, .22f, .22f, .22f, input.joystick2.x, input.joystick2.y);
+    float botLeftY = dlerp(-.81f, -.73f, -.81f, -.81f, -.81f, input.joystick2.x, input.joystick2.y);
+    float botRightX = dlerp(.412f, .337f, .412f, .412f, .412f, input.joystick2.x, input.joystick2.y);
+    float botRightY = dlerp(-.805f, -.6f, -.805f, -.805f, -.805f, input.joystick2.x, input.joystick2.y);
+    float topX = dlerp(.318f, .172f, .318f, .318f, .318f, input.joystick2.x, input.joystick2.y);
+    float topY = dlerp(-.6, -.513f, -.6f, -.6f, -.6f, input.joystick2.x, input.joystick2.y);
+    return inTri(x,y,
+        botLeftX, botLeftY,
+        botRightX, botRightY,
+        topX, topY,
+        0.1f) && y >= mouthBot && y <= mouthTop;
 }
 
 ColorF mouthSample(
@@ -512,14 +605,15 @@ ColorF mouthSample(
 
     ColorF color = BACKGROUND_COLOR;
     float mouthTopVal = mouthTop(x, input);
+    float mouthBotVal = mouthBot(x, input);
     color = rast(
         x,
         y,
         color,
         MOUTH_COLOR,
         input.antialiasingLevel,
-        [input, mouthTopVal](float sampleX, float sampleY) {
-            return sampleY > mouthBot(sampleX, input) && sampleY < mouthTopVal;
+        [input, mouthTopVal, mouthBotVal](float sampleX, float sampleY) {
+            return sampleY > mouthBotVal && sampleY < mouthTopVal;
         });
 
     color = rast(
@@ -528,8 +622,8 @@ ColorF mouthSample(
         color,
         TOOTH_COLOR,
         input.antialiasingLevel,
-        [input, mouthTopVal](float sampleX, float sampleY) {
-            return topTooth(sampleX, sampleY, mouthTopVal, input);
+        [input, mouthTopVal, mouthBotVal](float sampleX, float sampleY) {
+            return topTooth(sampleX, sampleY, mouthTopVal, input) || bottomTooth(sampleX, sampleY, mouthBotVal, mouthTopVal, input);
         });
 
     return color;

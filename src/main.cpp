@@ -109,6 +109,9 @@ void loop() {
   auto j1target = Hardware::readJoystick(0);
   auto j2target = Hardware::readJoystick(1);
 
+  j1target.x = roundf(j1target.x * 15.0f) / 15.0f;
+  j1target.y = roundf(j1target.y * 15.0f) / 15.0f;
+
   j1current.x = smoothDamp(j1current.x, j1target.x, j1Velocity.x, 0.018f, deltaSeconds);
   j1current.y = smoothDamp(j1current.y, j1target.y, j1Velocity.y, 0.018f, deltaSeconds);
   j2current.x = smoothDamp(j2current.x, j2target.x, j2Velocity.x, 0.018f, deltaSeconds);
