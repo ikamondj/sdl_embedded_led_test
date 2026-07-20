@@ -126,11 +126,45 @@ bool inTri(
 
     float bulge);
 
+/*
+ * Counterclockwise convex polygon test using a flat x, y argument list.
+ * Convexity allows an immediate rejection at the first outside edge.
+ */
+template<typename... Coordinates>
+inline bool inConvexPolygon(float x, float y, Coordinates... coordinates)
+{
+    static_assert(
+        sizeof...(Coordinates) >= 6 && sizeof...(Coordinates) % 2 == 0,
+        "A convex polygon requires at least three x/y coordinate pairs");
+
+    const float vertices[] = {static_cast<float>(coordinates)...};
+    constexpr int coordinateCount = static_cast<int>(sizeof...(Coordinates));
+
+    int previous = coordinateCount - 2;
+    for (int current = 0; current < coordinateCount; current += 2)
+    {
+        const float edgeX = vertices[current] - vertices[previous];
+        const float edgeY = vertices[current + 1] - vertices[previous + 1];
+        const float pointX = x - vertices[previous];
+        const float pointY = y - vertices[previous + 1];
+
+        if (edgeX * pointY - edgeY * pointX < -1e-6f) {
+            return false;
+        }
+
+        previous = current;
+    }
+
+    return true;
+}
+
 float saturate(float value);
 
 float lerpFloat(float a, float b, float amount);
 float smoothstep01(float value);
 float easeOutCubic(float value);
+
+float applyAntialiasingCoverageFalloff(float coverage, int gridSize);
 
 
 float saturate(float value);
@@ -238,9 +272,10 @@ ColorF rast(
         return existingColor;
     }
 
-    const float coverage =
+    const float coverage = applyAntialiasingCoverageFalloff(
         static_cast<float>(hitCount) /
-        static_cast<float>(sampleCount);
+            static_cast<float>(sampleCount),
+        gridSize);
 
     return mix(
         existingColor,

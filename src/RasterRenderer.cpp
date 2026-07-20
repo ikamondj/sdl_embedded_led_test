@@ -4,7 +4,26 @@
 #include <cmath>
 
 
-constexpr int SUPERSAMPLE_GRID = 1;
+constexpr int SUPERSAMPLE_GRID = 2;
+
+// Applied to predicate coverage when rast() uses a 2x2 or larger grid.
+// 0.0 is ordinary linear antialiasing.  Higher values increasingly suppress
+// low-coverage samples while preserving both zero and full coverage.
+constexpr float ANTIALIASING_COVERAGE_FALLOFF = 1.3f;
+
+
+float applyAntialiasingCoverageFalloff(float coverage, int gridSize)
+{
+    coverage = std::clamp(coverage, 0.0f, 1.0f);
+
+    if (gridSize < 2 || ANTIALIASING_COVERAGE_FALLOFF <= 0.0f) {
+        return coverage;
+    }
+
+    return std::pow(
+        coverage,
+        1.0f + ANTIALIASING_COVERAGE_FALLOFF);
+}
 
 
 
