@@ -1,8 +1,0 @@
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/CMakeFiles/Hub75Simulator.dir
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/CMakeFiles/ZERO_CHECK.dir
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/_deps/sdl2-build/CMakeFiles/sdl_headers_copy.dir
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/_deps/sdl2-build/CMakeFiles/SDL2main.dir
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/_deps/sdl2-build/CMakeFiles/SDL2-static.dir
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/_deps/sdl2-build/CMakeFiles/uninstall.dir
-C:/Users/ikamo/source/repos/Embedded/sdl_song_of_the_night/build/_deps/sdl2-build/CMakeFiles/ALL_BUILD.dir
