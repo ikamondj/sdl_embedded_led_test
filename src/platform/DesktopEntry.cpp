@@ -13,6 +13,8 @@ int main(int argc, char** argv) {
   bool threadedRenderer = false;
   bool precomputeMask = false;
   bool fpsLogging = false;
+  bool vsync = false;
+  bool windowedVisual = false;
   for (int index = 1; index < argc; ++index) {
     const std::string argument = argv[index];
     if (argument == "-d") {
@@ -23,9 +25,17 @@ int main(int argc, char** argv) {
       precomputeMask = true;
     } else if (argument == "-f") {
       fpsLogging = true;
+    } else if (argument == "-v") {
+      vsync = true;
+    } else if (argument == "-s") {
+      desktopVisual = true;
+      windowedVisual = true;
     } else {
-      std::cerr << "Usage: " << argv[0] << " [-d] [-t] [-p] [-f]\n"
+      std::cerr << "Usage: " << argv[0]
+                << " [-d] [-s] [-v] [-t] [-p] [-f]\n"
                 << "  -d  Use fullscreen SDL visual output.\n"
+                << "  -s  Use a resizable 64x32 SDL window.\n"
+                << "  -v  Enable SDL presentation VSync.\n"
                 << "  -t  Use the persistent four-core raster pool.\n"
                 << "  -p  Rebuild the offline pixel visibility mask and exit.\n"
                 << "  -f  Report average SDL presentation FPS once per second.\n";
@@ -45,6 +55,8 @@ int main(int argc, char** argv) {
 
   Hardware::useDesktopVisual(desktopVisual);
   Hardware::useFpsLogging(fpsLogging);
+  Hardware::useVsync(vsync);
+  Hardware::useWindowedVisual(windowedVisual);
   setThreadedRendering(threadedRenderer);
   if (loadRasterMask(maskPath)) {
     std::cout << "Using raster visibility mask: " << maskPath << '\n';

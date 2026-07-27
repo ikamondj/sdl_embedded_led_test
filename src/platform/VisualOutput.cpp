@@ -7,6 +7,8 @@ void clear(Hardware::Rgb color);
 void setPixel(int x, int y, Hardware::Rgb color);
 bool present();
 void useFpsLogging(bool enabled);
+void useVsync(bool enabled);
+void useWindowed(bool enabled);
 }  // namespace VisualSDL
 
 #if defined(HAVE_HUB75_OUTPUT)
@@ -41,6 +43,14 @@ void useDesktop(bool enabled) {
 
 void useFpsLogging(bool enabled) {
   VisualSDL::useFpsLogging(enabled);
+}
+
+void useVsync(bool enabled) {
+  VisualSDL::useVsync(enabled);
+}
+
+void useWindowed(bool enabled) {
+  VisualSDL::useWindowed(enabled);
 }
 
 bool initialize() {

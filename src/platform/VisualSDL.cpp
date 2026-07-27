@@ -22,6 +22,8 @@ SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 SDL_Texture* texture = nullptr;
 bool fpsLogging = false;
+bool vsyncEnabled = false;
+bool windowed = false;
 std::uint64_t fpsWindowStart = 0;
 std::uint32_t fpsFrameCount = 0;
 std::array<std::uint32_t,
@@ -123,22 +125,32 @@ bool initialize() {
     return false;
   }
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+  const int windowWidth =
+      windowed ? Hardware::MATRIX_WIDTH
+               : Hardware::MATRIX_WIDTH * WINDOW_SCALE;
+  const int windowHeight =
+      windowed ? Hardware::MATRIX_HEIGHT
+               : Hardware::MATRIX_HEIGHT * WINDOW_SCALE;
+  Uint32 windowFlags = SDL_WINDOW_SHOWN;
+  if (windowed) {
+    windowFlags |= SDL_WINDOW_RESIZABLE;
+#if defined(__linux__)
+  } else {
+    windowFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+#endif
+  }
   window = SDL_CreateWindow(
       "HUB75 64x32 Desktop Simulator", SDL_WINDOWPOS_CENTERED,
-      SDL_WINDOWPOS_CENTERED, Hardware::MATRIX_WIDTH * WINDOW_SCALE,
-      Hardware::MATRIX_HEIGHT * WINDOW_SCALE,
-#if defined(__linux__)
-      SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
-#else
-      SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-#endif
+      SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, windowFlags);
   if (!window) {
     std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << '\n';
     return false;
   }
 
-  renderer = SDL_CreateRenderer(
-      window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+  const Uint32 rendererFlags =
+      SDL_RENDERER_ACCELERATED |
+      (vsyncEnabled ? SDL_RENDERER_PRESENTVSYNC : 0);
+  renderer = SDL_CreateRenderer(window, -1, rendererFlags);
   if (!renderer) {
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
   }
@@ -237,6 +249,14 @@ bool present() {
 
 void useFpsLogging(bool enabled) {
   fpsLogging = enabled;
+}
+
+void useVsync(bool enabled) {
+  vsyncEnabled = enabled;
+}
+
+void useWindowed(bool enabled) {
+  windowed = enabled;
 }
 
 }  // namespace VisualSDL

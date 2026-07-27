@@ -37,6 +37,8 @@ bool isRunning();
 // false keeps the default HUB75 GPIO output.
 void useDesktopVisual(bool enabled);
 void useFpsLogging(bool enabled);
+void useVsync(bool enabled);
+void useWindowedVisual(bool enabled);
 
 // Inputs ----------------------------------------------------------------------
 // Joystick indices: 0 = left/first stick, 1 = right/second stick.

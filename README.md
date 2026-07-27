@@ -115,6 +115,20 @@ active display refresh rate at startup:
 ./build-pi/bin/Hub75Simulator -d -t -f
 ```
 
+SDL presentation is uncapped by default. Add `-v` to enable VSync:
+
+```bash
+./build-pi/bin/Hub75Simulator -d -v -f
+```
+
+Use `-s` instead of `-d` for a resizable SDL window whose initial client size
+is the panel's actual 64×32 resolution. On Linux/Pi, `-s` also selects SDL
+visual output instead of HUB75:
+
+```bash
+./build-pi/bin/Hub75Simulator -s -f
+```
+
 When launched from SSH, `-d` automatically discovers the local Wayland or X11
 desktop socket and the common Xauthority locations. Run it as the same user
 that owns the logged-in desktop session; a different user may not have
