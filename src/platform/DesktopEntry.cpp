@@ -9,7 +9,7 @@ int main() {
   setup();
 
   if (!Hardware::isRunning()) {
-    std::cerr << "Failed to initialize the desktop hardware simulator.\n";
+    std::cerr << "Failed to initialize the hardware interface.\n";
     Hardware::shutdown();
     return 1;
   }

@@ -27,9 +27,8 @@ enum class FaceButton : std::uint8_t {
 };
 
 // Platform lifetime -----------------------------------------------------------
-// The desktop implementation lives in src/platform/HardwareSDL.cpp.
-// Replace that file with an ESP32/HUB75 implementation later; application and
-// raster-renderer code do not need to change.
+// SDL supplies input on desktop and Raspberry Pi. The visual output is selected
+// at build time: an SDL window on non-Linux hosts and HUB75 GPIO on Linux.
 bool initialize();
 void shutdown();
 void poll();

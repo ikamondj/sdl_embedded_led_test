@@ -2,7 +2,7 @@
 #include "RasterRenderer.h"
 #include "DeltaTimer.h"
 
-// This file intentionally looks like microcontroller firmware. The desktop
+// This file intentionally looks like microcontroller firmware. The host
 // executable entry point is kept separately in src/platform/DesktopEntry.cpp.
 
 void setup() {
@@ -128,7 +128,7 @@ void loop() {
   renderFrame(input);
   Hardware::presentLeds();
 
-  // presentLeds() is normally synchronized to the desktop display. This small
-  // delay prevents a busy loop if a software SDL renderer is selected.
+  // presentLeds() is normally synchronized to VSync. This also avoids a busy
+  // loop if a software SDL renderer is explicitly selected.
   Hardware::delayMs(1);
 }

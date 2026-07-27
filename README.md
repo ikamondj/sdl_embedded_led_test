@@ -1,6 +1,9 @@
-# HUB75 Desktop Raster Simulator
+# HUB75 Raster Visualizer
 
-A desktop C++ simulation of a 64x32 HUB75-style LED matrix with two joysticks and four face buttons.
+A C++ 64x32 raster visualizer with two joysticks and four face buttons. Windows
+uses an SDL window automatically. Linux uses Raspberry Pi GPIO and a HUB75
+panel automatically; SDL remains active for controller input but creates no
+visual window.
 
 The application is deliberately split so `src/main.cpp` looks like firmware: it contains `setup()` and `loop()`, reads inputs through `Hardware` functions, invokes a CPU rasterizer, and presents a completed LED frame. SDL2 exists only behind the desktop hardware abstraction.
 
@@ -46,6 +49,37 @@ cmake --build build --config Release --parallel
 
 SDL2 uses its standardized GameController mapping, so Xbox-style, PlayStation-style, and many generic controllers expose the same two-stick/four-face-button interface. If a device has no SDL mapping, the simulator falls back to raw joystick axes 0/1 and 2/3 plus raw buttons 0/1/2/3. Controller hot-plugging is supported.
 
+## Raspberry Pi 4B / Ubuntu build
+
+Connect one 64x32 HUB75 panel through an Adafruit RGB Matrix Bonnet (the
+`adafruit-hat` GPIO mapping). On a 64-bit or 32-bit Raspberry Pi Ubuntu image:
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake git libsdl2-dev
+bash build_pi.sh
+sudo ./build-pi/bin/Hub75Simulator
+```
+
+The first build downloads and compiles
+[`rpi-rgb-led-matrix`](https://github.com/hzeller/rpi-rgb-led-matrix). The Pi 4
+backend defaults to a GPIO slowdown of 4, a chain length of 1, and one parallel
+panel. Root is needed for direct GPIO access. The process retains those
+privileges so SDL controller hot-plugging continues to work; run only this
+trusted binary.
+
+Linux intentionally selects real HUB75 output even when configured on another
+Linux machine. To request the simulator window for Linux development:
+
+```bash
+cmake -S . -B build-sdl -DVISUAL_OUTPUT=SDL
+cmake --build build-sdl --parallel
+```
+
+For stable refresh, disable onboard audio (it conflicts with the Bonnet GPIO
+mapping), avoid driving panel power from the Pi, and use a suitably rated 5 V
+power supply with a common ground.
+
 ## Project layout
 
 ```text
@@ -53,12 +87,15 @@ include/Hardware.h                 Replaceable hardware abstraction
 include/RasterRenderer.h           Renderer-facing input structure
 src/main.cpp                       Firmware-style setup() and loop()
 src/RasterRenderer.cpp             64x32 CPU rasterizer and pixel predicates
-src/platform/HardwareSDL.cpp       SDL2 input, framebuffer, and window backend
+src/platform/Hardware.cpp          SDL2 controller input and platform lifetime
+src/platform/VisualSDL.cpp         Non-Linux SDL window output
+src/platform/VisualHub75.cpp       Linux HUB75 GPIO output
+src/platform/VisualOutput.h        Internal visual-output interface
 src/platform/DesktopEntry.cpp      Desktop-only main() that calls setup()/loop()
 CMakeLists.txt                     Downloads SDL2 and builds the executable
 ```
 
-## Moving the same application to an ESP32/HUB75 panel
+## Moving the same application to another embedded target
 
 Keep these files largely unchanged:
 
@@ -68,7 +105,8 @@ src/RasterRenderer.cpp
 include/RasterRenderer.h
 ```
 
-Replace `src/platform/HardwareSDL.cpp` with an embedded implementation of the functions declared in `include/Hardware.h`:
+Replace `src/platform/Hardware.cpp` and the selected visual output with an
+embedded implementation of the functions declared in `include/Hardware.h`:
 
 - `readJoystick()` should return ADC-derived values normalized to `[-1,+1]`.
 - `readFaceButton()` should read the four GPIO inputs.

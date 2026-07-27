@@ -2,9 +2,9 @@
 #include <SDL.h>
 
 #include "Hardware.h"
+#include "VisualOutput.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -12,28 +12,16 @@
 namespace Hardware {
 namespace {
 
-constexpr int WINDOW_SCALE = 16;
 constexpr float CONTROLLER_DEADZONE = 0.15f;
 
-SDL_Window* window = nullptr;
-SDL_Renderer* renderer = nullptr;
-SDL_Texture* texture = nullptr;
 SDL_GameController* controller = nullptr;
 SDL_Joystick* rawJoystick = nullptr;
 SDL_JoystickID activeJoystickInstanceId = -1;
 
 bool running = false;
-std::array<std::uint32_t, MATRIX_WIDTH * MATRIX_HEIGHT> framebuffer{};
 
 float clampAxis(float value) {
   return std::clamp(value, -1.0f, 1.0f);
-}
-
-std::uint32_t packArgb(Rgb color) {
-  return 0xFF000000u
-       | (static_cast<std::uint32_t>(color.r) << 16u)
-       | (static_cast<std::uint32_t>(color.g) << 8u)
-       | static_cast<std::uint32_t>(color.b);
 }
 
 Vec2 applyRadialDeadzone(Vec2 value) {
@@ -216,56 +204,14 @@ SDL_Scancode keyboardButtonFor(FaceButton button) {
 
 bool initialize() {
   SDL_SetMainReady();
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
+  if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_JOYSTICK |
+               SDL_INIT_GAMECONTROLLER) != 0) {
     std::cerr << "SDL_Init failed: " << SDL_GetError() << '\n';
     return false;
   }
 
-  window = SDL_CreateWindow(
-      "HUB75 64x32 Desktop Simulator",
-      SDL_WINDOWPOS_CENTERED,
-      SDL_WINDOWPOS_CENTERED,
-      MATRIX_WIDTH * WINDOW_SCALE,
-      MATRIX_HEIGHT * WINDOW_SCALE,
-      SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-
-  if (window == nullptr) {
-    std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << '\n';
-    shutdown();
-    return false;
-  }
-
-  renderer = SDL_CreateRenderer(
-      window,
-      -1,
-      SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
-  if (renderer == nullptr) {
-    std::cerr << "Accelerated renderer unavailable; using software renderer.\n";
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
-  }
-
-  if (renderer == nullptr) {
-    std::cerr << "SDL_CreateRenderer failed: " << SDL_GetError() << '\n';
-    shutdown();
-    return false;
-  }
-
-  SDL_RenderSetLogicalSize(renderer, MATRIX_WIDTH, MATRIX_HEIGHT);
-  SDL_RenderSetIntegerScale(renderer, SDL_TRUE);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-
-  texture = SDL_CreateTexture(
-      renderer,
-      SDL_PIXELFORMAT_ARGB8888,
-      SDL_TEXTUREACCESS_STREAMING,
-      MATRIX_WIDTH,
-      MATRIX_HEIGHT);
-
-  if (texture == nullptr) {
-    std::cerr << "SDL_CreateTexture failed: " << SDL_GetError() << '\n';
+  if (!VisualOutput::initialize()) {
     shutdown();
     return false;
   }
@@ -287,22 +233,7 @@ bool initialize() {
 void shutdown() {
   running = false;
   closeActiveJoystick();
-
-  if (texture != nullptr) {
-    SDL_DestroyTexture(texture);
-    texture = nullptr;
-  }
-
-  if (renderer != nullptr) {
-    SDL_DestroyRenderer(renderer);
-    renderer = nullptr;
-  }
-
-  if (window != nullptr) {
-    SDL_DestroyWindow(window);
-    window = nullptr;
-  }
-
+  VisualOutput::shutdown();
   SDL_Quit();
 }
 
@@ -390,35 +321,17 @@ void delayMs(std::uint32_t milliseconds) {
 }
 
 void clearLeds(Rgb color) {
-  framebuffer.fill(packArgb(color));
+  VisualOutput::clear(color);
 }
 
 void setLed(int x, int y, Rgb color) {
-  if (x < 0 || x >= MATRIX_WIDTH || y < 0 || y >= MATRIX_HEIGHT) {
-    return;
-  }
-
-  framebuffer[static_cast<std::size_t>(y * MATRIX_WIDTH + x)] = packArgb(color);
+  VisualOutput::setPixel(x, y, color);
 }
 
 void presentLeds() {
-  if (renderer == nullptr || texture == nullptr) {
-    return;
-  }
-
-  if (SDL_UpdateTexture(
-          texture,
-          nullptr,
-          framebuffer.data(),
-          MATRIX_WIDTH * static_cast<int>(sizeof(std::uint32_t))) != 0) {
-    std::cerr << "SDL_UpdateTexture failed: " << SDL_GetError() << '\n';
+  if (!VisualOutput::present()) {
     running = false;
-    return;
   }
-
-  SDL_RenderClear(renderer);
-  SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-  SDL_RenderPresent(renderer);
 }
 
 }  // namespace Hardware
