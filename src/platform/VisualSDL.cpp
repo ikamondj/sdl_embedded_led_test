@@ -4,7 +4,15 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdlib>
+#include <filesystem>
 #include <iostream>
+#include <string>
+
+#if defined(__linux__)
+#include <glob.h>
+#include <unistd.h>
+#endif
 
 namespace VisualSDL {
 namespace {
@@ -23,11 +31,92 @@ std::uint32_t packArgb(Hardware::Rgb color) {
          static_cast<std::uint32_t>(color.b);
 }
 
+#if defined(__linux__)
+bool environmentVariableMissing(const char* name) {
+  const char* value = std::getenv(name);
+  return value == nullptr || *value == '\0';
+}
+
+void setIfFileExists(const char* name, const std::filesystem::path& path) {
+  if (environmentVariableMissing(name) && std::filesystem::exists(path)) {
+    setenv(name, path.string().c_str(), 0);
+  }
+}
+
+void discoverDesktopSession() {
+  const std::string runtimeDirectory =
+      "/run/user/" + std::to_string(static_cast<unsigned long>(getuid()));
+
+  if (environmentVariableMissing("XDG_RUNTIME_DIR") &&
+      std::filesystem::is_directory(runtimeDirectory)) {
+    setenv("XDG_RUNTIME_DIR", runtimeDirectory.c_str(), 0);
+  }
+
+  // Prefer the native Wayland session when its socket is available.
+  if (environmentVariableMissing("WAYLAND_DISPLAY") &&
+      std::filesystem::exists(
+          std::filesystem::path(runtimeDirectory) / "wayland-0")) {
+    setenv("WAYLAND_DISPLAY", "wayland-0", 0);
+  }
+
+  // SSH sessions generally omit DISPLAY even while the local X/Xwayland
+  // desktop continues to run on :0.
+  if (environmentVariableMissing("DISPLAY")) {
+    for (int display = 0; display < 10; ++display) {
+      const std::string socket =
+          "/tmp/.X11-unix/X" + std::to_string(display);
+      if (std::filesystem::exists(socket)) {
+        const std::string value = ":" + std::to_string(display);
+        setenv("DISPLAY", value.c_str(), 0);
+        break;
+      }
+    }
+  }
+
+  if (environmentVariableMissing("XAUTHORITY")) {
+    if (const char* home = std::getenv("HOME")) {
+      setIfFileExists(
+          "XAUTHORITY", std::filesystem::path(home) / ".Xauthority");
+    }
+    setIfFileExists(
+        "XAUTHORITY",
+        std::filesystem::path(runtimeDirectory) / "gdm" / "Xauthority");
+
+    // Mutter/Xwayland uses a generated authority filename.
+    glob_t matches{};
+    const std::string pattern = runtimeDirectory + "/.mutter-Xwaylandauth.*";
+    if (environmentVariableMissing("XAUTHORITY") &&
+        glob(pattern.c_str(), 0, nullptr, &matches) == 0 &&
+        matches.gl_pathc > 0) {
+      setenv("XAUTHORITY", matches.gl_pathv[0], 0);
+    }
+    globfree(&matches);
+  }
+}
+#endif
+
 }  // namespace
 
 bool initialize() {
+#if defined(__linux__)
+  discoverDesktopSession();
+#endif
   if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) {
     std::cerr << "SDL video initialization failed: " << SDL_GetError() << '\n';
+#if defined(__linux__)
+    std::cerr
+        << "DISPLAY=" << (std::getenv("DISPLAY") ? std::getenv("DISPLAY") : "<unset>")
+        << ", WAYLAND_DISPLAY="
+        << (std::getenv("WAYLAND_DISPLAY")
+                ? std::getenv("WAYLAND_DISPLAY")
+                : "<unset>")
+        << ", XDG_RUNTIME_DIR="
+        << (std::getenv("XDG_RUNTIME_DIR")
+                ? std::getenv("XDG_RUNTIME_DIR")
+                : "<unset>")
+        << "\nThe desktop may belong to another user or deny this process "
+           "access. Run -d as the logged-in desktop user.\n";
+#endif
     return false;
   }
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");

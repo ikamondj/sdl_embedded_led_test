@@ -81,6 +81,11 @@ fullscreen while keeping the same SDL controller input:
 ./build-pi/bin/Hub75Simulator -d
 ```
 
+When launched from SSH, `-d` automatically discovers the local Wayland or X11
+desktop socket and the common Xauthority locations. Run it as the same user
+that owns the logged-in desktop session; a different user may not have
+permission to connect to that display.
+
 For stable refresh, disable onboard audio (it conflicts with the Bonnet GPIO
 mapping), avoid driving panel power from the Pi, and use a suitably rated 5 V
 power supply with a common ground.
