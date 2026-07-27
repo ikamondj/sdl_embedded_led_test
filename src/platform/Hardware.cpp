@@ -275,6 +275,10 @@ bool isRunning() {
   return running;
 }
 
+void useDesktopVisual(bool enabled) {
+  VisualOutput::useDesktop(enabled);
+}
+
 Vec2 readJoystick(std::size_t index) {
   if (index > 1) {
     return {};

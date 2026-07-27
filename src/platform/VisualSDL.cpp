@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <iostream>
 
-namespace VisualOutput {
+namespace VisualSDL {
 namespace {
 
 constexpr int WINDOW_SCALE = 16;
@@ -35,7 +35,11 @@ bool initialize() {
       "HUB75 64x32 Desktop Simulator", SDL_WINDOWPOS_CENTERED,
       SDL_WINDOWPOS_CENTERED, Hardware::MATRIX_WIDTH * WINDOW_SCALE,
       Hardware::MATRIX_HEIGHT * WINDOW_SCALE,
+#if defined(__linux__)
+      SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
+#else
       SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+#endif
   if (!window) {
     std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << '\n';
     return false;
@@ -61,7 +65,7 @@ bool initialize() {
     std::cerr << "SDL_CreateTexture failed: " << SDL_GetError() << '\n';
     return false;
   }
-  clear({});
+  framebuffer.fill(packArgb({}));
   return true;
 }
 
@@ -101,4 +105,4 @@ bool present() {
   return true;
 }
 
-}  // namespace VisualOutput
+}  // namespace VisualSDL

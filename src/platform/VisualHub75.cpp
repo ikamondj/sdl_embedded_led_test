@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-namespace VisualOutput {
+namespace VisualHub75 {
 namespace {
 
 rgb_matrix::RGBMatrix* matrix = nullptr;
@@ -64,4 +64,4 @@ bool present() {
   return true;
 }
 
-}  // namespace VisualOutput
+}  // namespace VisualHub75

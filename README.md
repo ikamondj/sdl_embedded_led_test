@@ -68,12 +68,17 @@ panel. Root is needed for direct GPIO access. The process retains those
 privileges so SDL controller hot-plugging continues to work; run only this
 trusted binary.
 
-Linux intentionally selects real HUB75 output even when configured on another
-Linux machine. To request the simulator window for Linux development:
+Linux starts with real HUB75 output when no arguments are supplied:
 
 ```bash
-cmake -S . -B build-sdl -DVISUAL_OUTPUT=SDL
-cmake --build build-sdl --parallel
+sudo ./build-pi/bin/Hub75Simulator
+```
+
+Pass `-d` to use SDL visuals instead. On the Pi this opens the visualizer
+fullscreen while keeping the same SDL controller input:
+
+```bash
+./build-pi/bin/Hub75Simulator -d
 ```
 
 For stable refresh, disable onboard audio (it conflicts with the Bonnet GPIO

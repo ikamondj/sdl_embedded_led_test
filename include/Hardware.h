@@ -33,6 +33,9 @@ bool initialize();
 void shutdown();
 void poll();
 bool isRunning();
+// Call before initialize(). On Linux, true selects fullscreen SDL output;
+// false keeps the default HUB75 GPIO output.
+void useDesktopVisual(bool enabled);
 
 // Inputs ----------------------------------------------------------------------
 // Joystick indices: 0 = left/first stick, 1 = right/second stick.

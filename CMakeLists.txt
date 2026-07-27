@@ -6,20 +6,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# A Linux build is assumed to be the Raspberry Pi appliance build. Override
-# with -DVISUAL_OUTPUT=SDL when developing on a Linux desktop.
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set(_default_visual_output HUB75)
-else()
-  set(_default_visual_output SDL)
-endif()
-set(VISUAL_OUTPUT "${_default_visual_output}" CACHE STRING
-    "Visual backend: SDL or HUB75")
-set_property(CACHE VISUAL_OUTPUT PROPERTY STRINGS SDL HUB75)
-if(NOT VISUAL_OUTPUT STREQUAL "SDL" AND NOT VISUAL_OUTPUT STREQUAL "HUB75")
-  message(FATAL_ERROR "VISUAL_OUTPUT must be SDL or HUB75.")
-endif()
-
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   # Ubuntu on Raspberry Pi supplies SDL through libsdl2-dev. Using the system
   # package avoids building unused X11/Wayland dependencies from source.
@@ -40,12 +26,8 @@ else()
   FetchContent_MakeAvailable(SDL2)
 endif()
 
-set(PLATFORM_VISUAL_SOURCE src/platform/VisualSDL.cpp)
-if(VISUAL_OUTPUT STREQUAL "HUB75")
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    message(FATAL_ERROR "The HUB75 GPIO backend is supported only on Linux.")
-  endif()
-
+set(PLATFORM_VISUAL_SOURCES src/platform/VisualSDL.cpp)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   include(ExternalProject)
   find_program(MAKE_EXECUTABLE NAMES make gmake REQUIRED)
   set(RGB_MATRIX_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/rgb-matrix-src")
@@ -67,7 +49,7 @@ if(VISUAL_OUTPUT STREQUAL "HUB75")
     INTERFACE_INCLUDE_DIRECTORIES "${RGB_MATRIX_SOURCE_DIR}/include"
   )
   add_dependencies(rgb_matrix rgb_matrix_external)
-  set(PLATFORM_VISUAL_SOURCE src/platform/VisualHub75.cpp)
+  list(APPEND PLATFORM_VISUAL_SOURCES src/platform/VisualHub75.cpp)
 endif()
 
 add_executable(Hub75Simulator
@@ -76,13 +58,15 @@ add_executable(Hub75Simulator
   src/DeltaTimer.cpp
   src/platform/DesktopEntry.cpp
   src/platform/Hardware.cpp
-  ${PLATFORM_VISUAL_SOURCE}
+  src/platform/VisualOutput.cpp
+  ${PLATFORM_VISUAL_SOURCES}
   src/imagery/SongOfTheNight.cpp
 )
 
 target_include_directories(Hub75Simulator PRIVATE include src/platform)
 target_compile_definitions(Hub75Simulator PRIVATE
   $<$<PLATFORM_ID:Windows>:NOMINMAX;WIN32_LEAN_AND_MEAN>
+  $<$<PLATFORM_ID:Linux>:HAVE_HUB75_OUTPUT=1>
 )
 
 if(TARGET SDL2::SDL2-static)
@@ -95,7 +79,7 @@ else()
   message(FATAL_ERROR "SDL2 did not expose a supported CMake target.")
 endif()
 
-if(VISUAL_OUTPUT STREQUAL "HUB75")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_package(Threads REQUIRED)
   target_link_libraries(Hub75Simulator PRIVATE rgb_matrix Threads::Threads rt m)
 endif()
