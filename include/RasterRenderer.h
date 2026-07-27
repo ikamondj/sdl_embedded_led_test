@@ -3,6 +3,7 @@
 #include <array>
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #include "Hardware.h"
 
@@ -32,6 +33,8 @@ struct RenderInputs {
 void renderFrame(const RenderInputs& input);
 // Enables the multicore pixel renderer. Disabled by default.
 void setThreadedRendering(bool enabled);
+bool loadRasterMask(const std::string& path);
+bool generateRasterMask(const std::string& path);
 
 inline float clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);

@@ -89,6 +89,23 @@ single-threaded. Flags can be combined in either order:
 sudo ./build-pi/bin/Hub75Simulator -t
 ```
 
+The threaded renderer keeps three worker threads alive and asleep between
+frames while the main thread handles the fourth slice; it does not create or
+join threads in the frame loop.
+
+Use `-p` to regenerate the offline visibility mask. This samples a 200x200
+X/Y grid for each joystick, ignores and replaces any existing mask, writes
+`raster-mask.bin` beside the executable, and exits without initializing a
+display:
+
+```bash
+./build-pi/bin/Hub75Simulator -p
+```
+
+Normal runs load that file automatically when present and skip raster
+evaluation for pixels that stayed black throughout the sweep. Delete the file
+to disable the optimization.
+
 When launched from SSH, `-d` automatically discovers the local Wayland or X11
 desktop socket and the common Xauthority locations. Run it as the same user
 that owns the logged-in desktop session; a different user may not have
