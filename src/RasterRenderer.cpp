@@ -1,7 +1,10 @@
 #include "RasterRenderer.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <thread>
+#include <vector>
 
 
 constexpr int SUPERSAMPLE_GRID = 2;
@@ -30,6 +33,13 @@ float applyAntialiasingCoverageFalloff(float coverage, int gridSize)
 
 ColorF shadeSample(float x, float y, const RenderInputs& input);
 
+namespace {
+bool threadedRendering = false;
+}
+
+void setThreadedRendering(bool enabled) {
+  threadedRendering = enabled;
+}
 
 void renderFrame(const RenderInputs& input) {
   constexpr float worldWidth = 3.0f;
@@ -38,28 +48,74 @@ void renderFrame(const RenderInputs& input) {
   constexpr float pixelHeight = worldHeight / static_cast<float>(Hardware::MATRIX_HEIGHT);
   constexpr int sampleCount = SUPERSAMPLE_GRID * SUPERSAMPLE_GRID;
 
-  for (int pixelY = 0; pixelY < Hardware::MATRIX_HEIGHT; ++pixelY) {
-    for (int pixelX = 0; pixelX < Hardware::MATRIX_WIDTH; ++pixelX) {
-      ColorF accumulated{};
+  constexpr int pixelCount =
+      Hardware::MATRIX_WIDTH * Hardware::MATRIX_HEIGHT;
+  std::array<Hardware::Rgb, pixelCount> frame{};
 
-      for (int sampleY = 0; sampleY < SUPERSAMPLE_GRID; ++sampleY) {
-        for (int sampleX = 0; sampleX < SUPERSAMPLE_GRID; ++sampleX) {
-          const float subpixelX =
-              (static_cast<float>(sampleX) + 0.5f) / static_cast<float>(SUPERSAMPLE_GRID);
-          const float subpixelY =
-              (static_cast<float>(sampleY) + 0.5f) / static_cast<float>(SUPERSAMPLE_GRID);
+  auto renderPixel = [&](int pixelIndex) {
+    const int pixelX = pixelIndex % Hardware::MATRIX_WIDTH;
+    const int pixelY = pixelIndex / Hardware::MATRIX_WIDTH;
+    ColorF accumulated{};
 
-          // Pixel-center raster coordinates: X in [-2,+2], Y in [-1,+1], with
-          // positive Y upward to match a conventional shader coordinate system.
-          const float x = -1.5f + (static_cast<float>(pixelX) + subpixelX) * pixelWidth;
-          const float y = 0.75f - (static_cast<float>(pixelY) + subpixelY) * pixelHeight;
+    for (int sampleY = 0; sampleY < SUPERSAMPLE_GRID; ++sampleY) {
+      for (int sampleX = 0; sampleX < SUPERSAMPLE_GRID; ++sampleX) {
+        const float subpixelX =
+            (static_cast<float>(sampleX) + 0.5f) /
+            static_cast<float>(SUPERSAMPLE_GRID);
+        const float subpixelY =
+            (static_cast<float>(sampleY) + 0.5f) /
+            static_cast<float>(SUPERSAMPLE_GRID);
 
-          accumulated = add(accumulated, shadeSample(x, y, input));
-        }
+        // Pixel-center raster coordinates: X in [-1.5,+1.5],
+        // Y in [-0.75,+0.75], with positive Y upward.
+        const float x =
+            -1.5f + (static_cast<float>(pixelX) + subpixelX) * pixelWidth;
+        const float y =
+            0.75f - (static_cast<float>(pixelY) + subpixelY) * pixelHeight;
+
+        accumulated = add(accumulated, shadeSample(x, y, input));
       }
-
-      Hardware::setLed(pixelX, pixelY, toRgb8(scale(accumulated, 1.0f / sampleCount)));
     }
+
+    frame[static_cast<std::size_t>(pixelIndex)] =
+        toRgb8(scale(accumulated, 1.0f / sampleCount));
+  };
+
+  // The imagery owns stateful blink/gaze schedulers. Rendering the first pixel
+  // primes that state once; every remaining sample is then read-only and can
+  // safely be evaluated in parallel without changing the resulting image.
+  renderPixel(0);
+
+  const unsigned detectedThreads =
+      threadedRendering ? std::thread::hardware_concurrency() : 1;
+  const int workerCount = std::clamp(
+      static_cast<int>(detectedThreads == 0 ? 1 : detectedThreads), 1, 4);
+
+  std::vector<std::thread> workers;
+  workers.reserve(static_cast<std::size_t>(workerCount - 1));
+  for (int worker = 1; worker < workerCount; ++worker) {
+    const int begin = 1 + ((pixelCount - 1) * worker) / workerCount;
+    const int end = 1 + ((pixelCount - 1) * (worker + 1)) / workerCount;
+    workers.emplace_back([&, begin, end]() {
+      for (int pixel = begin; pixel < end; ++pixel) {
+        renderPixel(pixel);
+      }
+    });
+  }
+
+  const int mainEnd = 1 + (pixelCount - 1) / workerCount;
+  for (int pixel = 1; pixel < mainEnd; ++pixel) {
+    renderPixel(pixel);
+  }
+  for (auto& worker : workers) {
+    worker.join();
+  }
+
+  for (int pixel = 0; pixel < pixelCount; ++pixel) {
+    Hardware::setLed(
+        pixel % Hardware::MATRIX_WIDTH,
+        pixel / Hardware::MATRIX_WIDTH,
+        frame[static_cast<std::size_t>(pixel)]);
   }
 }
 

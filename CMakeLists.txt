@@ -6,6 +6,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Make ordinary `cmake -S . -B build` invocations optimized on Linux and other
+# single-config generators. Debug remains available with
+# -DCMAKE_BUILD_TYPE=Debug.
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY
+               STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   # Ubuntu on Raspberry Pi supplies SDL through libsdl2-dev. Using the system
   # package avoids building unused X11/Wayland dependencies from source.

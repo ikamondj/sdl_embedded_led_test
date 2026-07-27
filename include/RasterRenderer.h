@@ -30,6 +30,8 @@ struct RenderInputs {
 };
 
 void renderFrame(const RenderInputs& input);
+// Enables the multicore pixel renderer. Disabled by default.
+void setThreadedRendering(bool enabled);
 
 inline float clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);

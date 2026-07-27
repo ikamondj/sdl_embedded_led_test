@@ -198,6 +198,9 @@ ColorF eyeSample(
     /*
     * Handle program startup or the simulation clock being reset backward.
     */
+    const bool newBlinkFrame =
+        !blinkTimerInitialized || time != previousTime;
+
     if (!blinkTimerInitialized || time < previousTime)
     {
         blinkTimerInitialized = true;
@@ -205,18 +208,21 @@ ColorF eyeSample(
         nextBlinkStart = time + chooseBlinkInterval();
     }
 
-    previousTime = time;
-
     /*
     * Start a blink when its scheduled time arrives, then immediately schedule
-    * the next one.
+    * the next one. Rendering calls eyeSample() thousands of times with the same
+    * timestamp, so mutate animation state only on the first sample of a frame.
     */
-    if (time >= nextBlinkStart)
+    if (newBlinkFrame && time >= nextBlinkStart)
     {
         activeBlinkStart = time;
         nextBlinkStart =
             activeBlinkStart +
             chooseBlinkInterval();
+    }
+
+    if (newBlinkFrame) {
+        previousTime = time;
     }
 
     const float blinkTime =

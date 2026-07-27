@@ -81,6 +81,14 @@ fullscreen while keeping the same SDL controller input:
 ./build-pi/bin/Hub75Simulator -d
 ```
 
+Pass `-t` to enable the four-core rasterizer. Without it, rendering remains
+single-threaded. Flags can be combined in either order:
+
+```bash
+./build-pi/bin/Hub75Simulator -d -t
+sudo ./build-pi/bin/Hub75Simulator -t
+```
+
 When launched from SSH, `-d` automatically discovers the local Wayland or X11
 desktop socket and the common Xauthority locations. Run it as the same user
 that owns the logged-in desktop session; a different user may not have
