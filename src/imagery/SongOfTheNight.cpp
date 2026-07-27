@@ -515,10 +515,10 @@ ColorF eyeSample(
                 : 0.5f * (safeLowerY + safeUpperY));
 
     const float leftCenterX =
-        -EYE_SPACING + pupilOffsetX - .03f * abs(pupilOffsetX);
+        -EYE_SPACING + pupilOffsetX - .03f * std::fabs(pupilOffsetX);
 
     const float rightCenterX =
-        EYE_SPACING + pupilOffsetX  + .03f * abs(pupilOffsetX);
+        EYE_SPACING + pupilOffsetX  + .03f * std::fabs(pupilOffsetX);
 
     const float centerY =
         pupilOffsetY;
@@ -627,7 +627,7 @@ ColorF eyeSample(
         innerPupilPredicate);
 
     color = rast(
-        abs(x),
+        std::fabs(x),
         y,
         color,
         BROW_COLOR,
@@ -646,7 +646,7 @@ float mouthWidth(const RenderInputs& input) {
 float mouthTop(float x, const RenderInputs& input) {
     float mouthW = mouthWidth(input);
 
-    if (abs(x) > mouthW) {
+    if (std::fabs(x) > mouthW) {
         return -5.0f;
     }
     float openSmile = 0.7f*x*x*x*x-.55f;
@@ -667,7 +667,7 @@ float mouthTop(float x, const RenderInputs& input) {
 float mouthBot(float x, const RenderInputs& input) {
     float mouthW = mouthWidth(input);
 
-    if (abs(x) > mouthW) {
+    if (std::fabs(x) > mouthW) {
         return 5.0f;
     }
     
@@ -686,7 +686,7 @@ float mouthBot(float x, const RenderInputs& input) {
 }
 
 bool topTooth(float x, float y, float mouthTop, const RenderInputs& input) {
-    x = abs(x);
+    x = std::fabs(x);
     float topLeftX = dlerp(.395f, .25f, .395f, .395f, .39f, input.joystick2.x, input.joystick2.y);
     float topLeftY = dlerp(-.497f, -.018f, -.497f, -.497f, -.283f, input.joystick2.x, input.joystick2.y);
     float topRightX = dlerp(.602f, .373f, .602f, .602f, .55f, input.joystick2.x, input.joystick2.y);
@@ -701,7 +701,7 @@ bool topTooth(float x, float y, float mouthTop, const RenderInputs& input) {
 }
 
 bool bottomTooth(float x, float y, float mouthBot, float mouthTop, const RenderInputs& input) {
-    x = abs(x);
+    x = std::fabs(x);
     float botLeftX = dlerp(.22f, .173f, .22f, .22f, .242f, input.joystick2.x, input.joystick2.y);
     float botLeftY = dlerp(-.81f, -.73f, -.81f, -.81f, -.716f, input.joystick2.x, input.joystick2.y);
     float botRightX = dlerp(.412f, .337f, .412f, .412f, .4f, input.joystick2.x, input.joystick2.y);
@@ -755,22 +755,24 @@ ColorF mouthSample(
         x,
         y,
         color,
-        TOOTH_COLOR,
-        input.antialiasingLevel,
-        [input, mouthTopVal, mouthBotVal](float sampleX, float sampleY) {
-            return topTooth(sampleX, sampleY, mouthTopVal, input) || bottomTooth(sampleX, sampleY, mouthBotVal, mouthTopVal, input);
-        });
-
-    color = rast(
-        x,
-        y,
-        color,
         TOUNGUE_COLOR,
         input.antialiasingLevel,
         [input, mouthTopVal](float sampleX, float sampleY) {
             return tongue(sampleX, sampleY, mouthTopVal, input);
         }
     );
+
+    color = rast(
+        x,
+        y,
+        color,
+        TOOTH_COLOR,
+        input.antialiasingLevel,
+        [input, mouthTopVal, mouthBotVal](float sampleX, float sampleY) {
+            return topTooth(sampleX, sampleY, mouthTopVal, input) ||
+                   bottomTooth(
+                       sampleX, sampleY, mouthBotVal, mouthTopVal, input);
+        });
 
     return color;
 }
