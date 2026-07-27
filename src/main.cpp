@@ -127,8 +127,4 @@ void loop() {
 
   renderFrame(input);
   Hardware::presentLeds();
-
-  // presentLeds() is normally synchronized to VSync. This also avoids a busy
-  // loop if a software SDL renderer is explicitly selected.
-  Hardware::delayMs(1);
 }

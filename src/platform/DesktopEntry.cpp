@@ -1,9 +1,13 @@
 #include "Hardware.h"
 #include "RasterRenderer.h"
 
+#include <chrono>
+#include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <filesystem>
 #include <string>
+#include <thread>
 
 void setup();
 void loop();
@@ -15,6 +19,7 @@ int main(int argc, char** argv) {
   bool fpsLogging = false;
   bool vsync = false;
   bool windowedVisual = false;
+  double frameRateLimit = 0.0;
   for (int index = 1; index < argc; ++index) {
     const std::string argument = argv[index];
     if (argument == "-d") {
@@ -30,15 +35,28 @@ int main(int argc, char** argv) {
     } else if (argument == "-s") {
       desktopVisual = true;
       windowedVisual = true;
+    } else if (argument == "-fps") {
+      if (index + 1 >= argc) {
+        std::cerr << "-fps requires a positive number.\n";
+        return 2;
+      }
+      char* end = nullptr;
+      frameRateLimit = std::strtod(argv[++index], &end);
+      if (end == argv[index] || *end != '\0' ||
+          !std::isfinite(frameRateLimit) || frameRateLimit <= 0.0) {
+        std::cerr << "Invalid frame-rate limit: " << argv[index] << '\n';
+        return 2;
+      }
     } else {
       std::cerr << "Usage: " << argv[0]
-                << " [-d] [-s] [-v] [-t] [-p] [-f]\n"
+                << " [-d] [-s] [-v] [-t] [-p] [-f] [-fps number]\n"
                 << "  -d  Use fullscreen SDL visual output.\n"
                 << "  -s  Use a resizable 64x32 SDL window.\n"
                 << "  -v  Enable SDL presentation VSync.\n"
                 << "  -t  Use the persistent four-core raster pool.\n"
                 << "  -p  Rebuild the offline pixel visibility mask and exit.\n"
-                << "  -f  Report average SDL presentation FPS once per second.\n";
+                << "  -f  Report average SDL presentation FPS once per second.\n"
+                << "  -fps N  Limit rendering to N frames per second.\n";
       return 2;
     }
   }
@@ -69,8 +87,22 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  if (frameRateLimit > 0.0) {
+    std::cout << "Frame-rate limit: " << frameRateLimit << " FPS\n";
+  }
+
+  using FrameClock = std::chrono::steady_clock;
+  const std::chrono::duration<double> targetFrameDuration =
+      frameRateLimit > 0.0
+          ? std::chrono::duration<double>(1.0 / frameRateLimit)
+          : std::chrono::duration<double>::zero();
+
   while (Hardware::isRunning()) {
+    const FrameClock::time_point frameStart = FrameClock::now();
     loop();
+    if (frameRateLimit > 0.0 && Hardware::isRunning()) {
+      std::this_thread::sleep_until(frameStart + targetFrameDuration);
+    }
   }
 
   Hardware::shutdown();

@@ -129,6 +129,15 @@ visual output instead of HUB75:
 ./build-pi/bin/Hub75Simulator -s -f
 ```
 
+Rendering is uncapped unless VSync or a frame limit is requested. Use
+`-fps <number>` to cap either SDL or HUB75 operation. The limiter sleeps for
+the unused portion of each frame:
+
+```bash
+./build-pi/bin/Hub75Simulator -s -fps 60 -f
+sudo ./build-pi/bin/Hub75Simulator -fps 60
+```
+
 When launched from SSH, `-d` automatically discovers the local Wayland or X11
 desktop socket and the common Xauthority locations. Run it as the same user
 that owns the logged-in desktop session; a different user may not have
