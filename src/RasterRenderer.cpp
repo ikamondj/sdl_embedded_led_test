@@ -46,6 +46,7 @@ constexpr int PIXEL_COUNT =
 bool threadedRendering = false;
 bool rasterMaskLoaded = false;
 std::array<std::uint8_t, PIXEL_COUNT> rasterMask{};
+std::vector<int> visibleRasterPixels;
 
 class RasterPool {
 public:
@@ -158,10 +159,6 @@ Frame computeFrame(const RenderInputs& input, bool applyMask) {
   Frame frame{};
 
   auto renderPixel = [&](int pixelIndex) {
-    if (applyMask && rasterMaskLoaded && rasterMask[
-            static_cast<std::size_t>(pixelIndex)] != 0) {
-      return;
-    }
     const int pixelX = pixelIndex % Hardware::MATRIX_WIDTH;
     const int pixelY = pixelIndex / Hardware::MATRIX_WIDTH;
     ColorF accumulated{};
@@ -194,13 +191,22 @@ Frame computeFrame(const RenderInputs& input, bool applyMask) {
   // even when the visibility mask marks it black.
   renderPixel(0);
 
+  const bool useMask = applyMask && rasterMaskLoaded;
+  const int workBegin = useMask ? 0 : 1;
+  const int workEnd = useMask
+      ? static_cast<int>(visibleRasterPixels.size())
+      : PIXEL_COUNT;
   auto renderRange = [&](int begin, int end) {
-    for (int pixel = begin; pixel < end; ++pixel) renderPixel(pixel);
+    for (int work = begin; work < end; ++work) {
+      renderPixel(useMask
+          ? visibleRasterPixels[static_cast<std::size_t>(work)]
+          : work);
+    }
   };
   if (threadedRendering) {
-    rasterPool().run(renderRange, 1, PIXEL_COUNT);
+    rasterPool().run(renderRange, workBegin, workEnd);
   } else {
-    renderRange(1, PIXEL_COUNT);
+    renderRange(workBegin, workEnd);
   }
 
   return frame;
@@ -230,7 +236,28 @@ bool loadRasterMask(const std::string& path) {
       reinterpret_cast<char*>(rasterMask.data()),
       static_cast<std::streamsize>(rasterMask.size()));
   if (!input) return false;
+
+  visibleRasterPixels.clear();
+  visibleRasterPixels.reserve(PIXEL_COUNT);
+  for (int pixel = 1; pixel < PIXEL_COUNT; ++pixel) {
+    if (rasterMask[static_cast<std::size_t>(pixel)] == 0) {
+      visibleRasterPixels.push_back(pixel);
+    }
+  }
   rasterMaskLoaded = true;
+
+  // Pixel zero is always evaluated once to update blink/gaze state, so do not
+  // claim it as a saving even if the offline mask marked it black.
+  int skipped = 0;
+  for (int pixel = 1; pixel < PIXEL_COUNT; ++pixel) {
+    skipped += rasterMask[static_cast<std::size_t>(pixel)] != 0 ? 1 : 0;
+  }
+  const float percent =
+      100.0f * static_cast<float>(skipped) /
+      static_cast<float>(PIXEL_COUNT);
+  std::cout << "Raster mask: skipping " << skipped << " / " << PIXEL_COUNT
+            << " pixels per frame (" << percent << "%); rendering "
+            << (PIXEL_COUNT - skipped) << ".\n";
   return true;
 }
 
