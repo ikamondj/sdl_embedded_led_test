@@ -42,11 +42,19 @@ ColorF shadeSample(float x, float y, const RenderInputs& input);
 namespace {
 constexpr int PIXEL_COUNT =
     Hardware::MATRIX_WIDTH * Hardware::MATRIX_HEIGHT;
+constexpr int PASS_COUNT = static_cast<int>(RasterPass::Count);
 
 bool threadedRendering = false;
 bool rasterMaskLoaded = false;
 std::array<std::uint8_t, PIXEL_COUNT> rasterMask{};
+std::array<std::array<std::uint8_t, PIXEL_COUNT>, PASS_COUNT> passMasks{};
 std::vector<int> visibleRasterPixels;
+bool recordingPassRelevance = false;
+thread_local int activeRasterPixel = -1;
+
+constexpr std::array<const char*, PASS_COUNT> PASS_NAMES{{
+    "eye", "pupil", "pupil-highlight", "inner-pupil", "brow",
+    "mouth", "tongue", "teeth", "top-bangs", "bottom-bangs"}};
 
 class RasterPool {
 public:
@@ -146,6 +154,22 @@ void setThreadedRendering(bool enabled) {
   threadedRendering = enabled;
 }
 
+bool rasterPassRelevant(RasterPass pass) {
+  if (recordingPassRelevance || !rasterMaskLoaded ||
+      activeRasterPixel < 0) {
+    return true;
+  }
+  return passMasks[static_cast<std::size_t>(pass)]
+                  [static_cast<std::size_t>(activeRasterPixel)] != 0;
+}
+
+void recordRasterPassChange(RasterPass pass) {
+  if (recordingPassRelevance && activeRasterPixel >= 0) {
+    passMasks[static_cast<std::size_t>(pass)]
+             [static_cast<std::size_t>(activeRasterPixel)] = 1;
+  }
+}
+
 namespace {
 using Frame = std::array<Hardware::Rgb, PIXEL_COUNT>;
 
@@ -159,6 +183,7 @@ Frame computeFrame(const RenderInputs& input, bool applyMask) {
   Frame frame{};
 
   auto renderPixel = [&](int pixelIndex) {
+    activeRasterPixel = pixelIndex;
     const int pixelX = pixelIndex % Hardware::MATRIX_WIDTH;
     const int pixelY = pixelIndex / Hardware::MATRIX_WIDTH;
     ColorF accumulated{};
@@ -229,13 +254,24 @@ bool loadRasterMask(const std::string& path) {
 
   std::array<char, 8> magic{};
   input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
-  constexpr std::array<char, 8> expected{{'S','O','T','N','M','A','S','K'}};
+  constexpr std::array<char, 8> expected{{'S','O','T','N','P','A','S','S'}};
   if (!input || magic != expected) return false;
 
-  input.read(
-      reinterpret_cast<char*>(rasterMask.data()),
-      static_cast<std::streamsize>(rasterMask.size()));
+  for (auto& mask : passMasks) {
+    input.read(
+        reinterpret_cast<char*>(mask.data()),
+        static_cast<std::streamsize>(mask.size()));
+  }
   if (!input) return false;
+
+  for (int pixel = 0; pixel < PIXEL_COUNT; ++pixel) {
+    bool anyRelevant = false;
+    for (const auto& mask : passMasks) {
+      anyRelevant = anyRelevant ||
+          mask[static_cast<std::size_t>(pixel)] != 0;
+    }
+    rasterMask[static_cast<std::size_t>(pixel)] = anyRelevant ? 0 : 1;
+  }
 
   visibleRasterPixels.clear();
   visibleRasterPixels.reserve(PIXEL_COUNT);
@@ -246,29 +282,33 @@ bool loadRasterMask(const std::string& path) {
   }
   rasterMaskLoaded = true;
 
-  // Pixel zero is always evaluated once to update blink/gaze state, so do not
-  // claim it as a saving even if the offline mask marked it black.
-  int skipped = 0;
-  for (int pixel = 1; pixel < PIXEL_COUNT; ++pixel) {
-    skipped += rasterMask[static_cast<std::size_t>(pixel)] != 0 ? 1 : 0;
+  for (int pass = 0; pass < PASS_COUNT; ++pass) {
+    const int relevant = static_cast<int>(std::count(
+        passMasks[static_cast<std::size_t>(pass)].begin(),
+        passMasks[static_cast<std::size_t>(pass)].end(),
+        static_cast<std::uint8_t>(1)));
+    std::cout << "Raster pass " << PASS_NAMES[static_cast<std::size_t>(pass)]
+              << ": " << relevant << " / " << PIXEL_COUNT
+              << " relevant pixels; skipping "
+              << (PIXEL_COUNT - relevant) << ".\n";
   }
-  const float percent =
-      100.0f * static_cast<float>(skipped) /
-      static_cast<float>(PIXEL_COUNT);
-  std::cout << "Raster mask: skipping " << skipped << " / " << PIXEL_COUNT
-            << " pixels per frame (" << percent << "%); rendering "
-            << (PIXEL_COUNT - skipped) << ".\n";
+
+  const int fullySkipped = static_cast<int>(std::count(
+      rasterMask.begin(), rasterMask.end(), static_cast<std::uint8_t>(1)));
+  std::cout << "Raster union: " << fullySkipped << " / " << PIXEL_COUNT
+            << " pixels skip every pass.\n";
   return true;
 }
 
 bool generateRasterMask(const std::string& path) {
-  constexpr int gridSize = 200;
-  std::array<std::uint8_t, PIXEL_COUNT> everVisible{};
+  constexpr int gridSize = 80;
   const bool previousThreading = threadedRendering;
   threadedRendering = true;
   rasterMaskLoaded = false;
+  recordingPassRelevance = true;
+  for (auto& mask : passMasks) mask.fill(0);
 
-  std::cout << "Precomputing raster visibility mask ("
+  std::cout << "Precomputing per-pass raster relevance ("
             << (2 * gridSize * gridSize) << " frames)...\n";
   int frameNumber = 0;
   for (int joystick = 0; joystick < 2; ++joystick) {
@@ -282,16 +322,11 @@ bool generateRasterMask(const std::string& path) {
                         static_cast<float>(gridSize - 1);
         RenderInputs input{};
         input.timeSeconds = static_cast<float>(frameNumber) * 0.001f;
+        input.disableBlink = true;
         if (joystick == 0) input.joystick1 = {x, y};
         else input.joystick2 = {x, y};
 
-        const Frame frame = computeFrame(input, false);
-        for (int pixel = 0; pixel < PIXEL_COUNT; ++pixel) {
-          const Hardware::Rgb color = frame[static_cast<std::size_t>(pixel)];
-          if (color.r != 0 || color.g != 0 || color.b != 0) {
-            everVisible[static_cast<std::size_t>(pixel)] = 1;
-          }
-        }
+        (void)computeFrame(input, false);
         ++frameNumber;
       }
       if ((gridY + 1) % 10 == 0) {
@@ -301,27 +336,47 @@ bool generateRasterMask(const std::string& path) {
     }
   }
 
+  recordingPassRelevance = false;
   threadedRendering = previousThreading;
+
+  // Autonomous pupil offsets are deliberately not bounded by the joystick
+  // sweep. Keep the three inexpensive circle passes universally relevant.
+  passMasks[static_cast<std::size_t>(RasterPass::Pupil)].fill(1);
+  passMasks[static_cast<std::size_t>(RasterPass::PupilHighlight)].fill(1);
+  passMasks[static_cast<std::size_t>(RasterPass::InnerPupil)].fill(1);
+
   for (int pixel = 0; pixel < PIXEL_COUNT; ++pixel) {
-    rasterMask[static_cast<std::size_t>(pixel)] =
-        everVisible[static_cast<std::size_t>(pixel)] ? 0 : 1;
+    bool anyRelevant = false;
+    for (const auto& mask : passMasks) {
+      anyRelevant = anyRelevant ||
+          mask[static_cast<std::size_t>(pixel)] != 0;
+    }
+    rasterMask[static_cast<std::size_t>(pixel)] = anyRelevant ? 0 : 1;
   }
 
   std::ofstream output(path, std::ios::binary | std::ios::trunc);
-  constexpr std::array<char, 8> magic{{'S','O','T','N','M','A','S','K'}};
+  constexpr std::array<char, 8> magic{{'S','O','T','N','P','A','S','S'}};
   output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
-  output.write(
-      reinterpret_cast<const char*>(rasterMask.data()),
-      static_cast<std::streamsize>(rasterMask.size()));
+  for (const auto& mask : passMasks) {
+    output.write(
+        reinterpret_cast<const char*>(mask.data()),
+        static_cast<std::streamsize>(mask.size()));
+  }
   if (!output) {
     std::cerr << "Could not write raster mask: " << path << '\n';
     return false;
   }
 
-  const int skipped = static_cast<int>(std::count(
-      rasterMask.begin(), rasterMask.end(), static_cast<std::uint8_t>(1)));
-  std::cout << "Wrote " << path << "; skipping " << skipped << " of "
-            << PIXEL_COUNT << " pixels.\n";
+  std::cout << "Wrote per-pass raster mask: " << path << '\n';
+  for (int pass = 0; pass < PASS_COUNT; ++pass) {
+    const int relevant = static_cast<int>(std::count(
+        passMasks[static_cast<std::size_t>(pass)].begin(),
+        passMasks[static_cast<std::size_t>(pass)].end(),
+        static_cast<std::uint8_t>(1)));
+    std::cout << "  " << PASS_NAMES[static_cast<std::size_t>(pass)]
+              << ": " << relevant << " relevant, "
+              << (PIXEL_COUNT - relevant) << " skipped\n";
+  }
   return true;
 }
 

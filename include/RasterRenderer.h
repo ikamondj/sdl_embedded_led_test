@@ -27,7 +27,22 @@ struct RenderInputs {
   JoystickState joystick2{};
 
   std::array<bool, 4> faceButtons{};
-  int antialiasingLevel = 1;    
+  int antialiasingLevel = 1;
+  bool disableBlink = false;
+};
+
+enum class RasterPass : std::uint8_t {
+  Eye = 0,
+  Pupil,
+  PupilHighlight,
+  InnerPupil,
+  Brow,
+  Mouth,
+  Tongue,
+  Teeth,
+  TopBangs,
+  BottomBangs,
+  Count
 };
 
 void renderFrame(const RenderInputs& input);
@@ -35,6 +50,8 @@ void renderFrame(const RenderInputs& input);
 void setThreadedRendering(bool enabled);
 bool loadRasterMask(const std::string& path);
 bool generateRasterMask(const std::string& path);
+bool rasterPassRelevant(RasterPass pass);
+void recordRasterPassChange(RasterPass pass);
 
 inline float clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);
@@ -237,8 +254,12 @@ ColorF rast(
     const ColorF& existingColor,
     const ColorF& componentColor,
     int antialiasingLevel,
+    RasterPass pass,
     const Predicate& predicate)
 {
+    if (!rasterPassRelevant(pass)) {
+        return existingColor;
+    }
     const int gridSize =
         std::max(1, std::min(3, antialiasingLevel));
 
@@ -282,9 +303,15 @@ ColorF rast(
             static_cast<float>(sampleCount),
         gridSize);
 
-    return mix(
+    const ColorF result = mix(
         existingColor,
         componentColor,
         coverage);
+    if (result.r != existingColor.r ||
+        result.g != existingColor.g ||
+        result.b != existingColor.b) {
+        recordRasterPassChange(pass);
+    }
+    return result;
 }
 

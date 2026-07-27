@@ -259,6 +259,10 @@ ColorF eyeSample(
                 openingTime / OPEN_TIME);
     }
 
+    if (input.disableBlink) {
+        blink = 0.0f;
+    }
+
     float blinkability = dlerp(
             1.0f, 
             0.0f, 
@@ -606,6 +610,7 @@ ColorF eyeSample(
         color,
         EYE_COLOR,
         input.antialiasingLevel,
+        RasterPass::Eye,
         eyePredicate);
 
     color = rast(
@@ -614,6 +619,7 @@ ColorF eyeSample(
         color,
         PUPIL_COLOR,
         input.antialiasingLevel,
+        RasterPass::Pupil,
         pupilPredicate);
 
     color = rast(
@@ -622,6 +628,7 @@ ColorF eyeSample(
         color,
         SCLERA_COLOR,
         input.antialiasingLevel,
+        RasterPass::PupilHighlight,
         scleraPredicate);
 
     color = rast(
@@ -630,6 +637,7 @@ ColorF eyeSample(
         color,
         INNER_PUPIL_COLOR,
         input.antialiasingLevel,
+        RasterPass::InnerPupil,
         innerPupilPredicate);
 
     color = rast(
@@ -638,6 +646,7 @@ ColorF eyeSample(
         color,
         BROW_COLOR,
         input.antialiasingLevel,
+        RasterPass::Brow,
         browPredicate
     );
 
@@ -753,6 +762,7 @@ ColorF mouthSample(
         color,
         MOUTH_COLOR,
         input.antialiasingLevel,
+        RasterPass::Mouth,
         [input, mouthTopVal, mouthBotVal](float sampleX, float sampleY) {
             return sampleY > mouthBotVal && sampleY < mouthTopVal;
         });
@@ -763,6 +773,7 @@ ColorF mouthSample(
         color,
         TOUNGUE_COLOR,
         input.antialiasingLevel,
+        RasterPass::Tongue,
         [input, mouthTopVal](float sampleX, float sampleY) {
             return tongue(sampleX, sampleY, mouthTopVal, input);
         }
@@ -774,6 +785,7 @@ ColorF mouthSample(
         color,
         TOOTH_COLOR,
         input.antialiasingLevel,
+        RasterPass::Teeth,
         [input, mouthTopVal, mouthBotVal](float sampleX, float sampleY) {
             return topTooth(sampleX, sampleY, mouthTopVal, input) ||
                    bottomTooth(
@@ -795,6 +807,7 @@ ColorF topbangs(
         existingColor,
         TOP_BANGS_COLOR,
         input.antialiasingLevel,
+        RasterPass::TopBangs,
         [](float sampleX, float sampleY) {
             sampleX += 0.05f;
             return inConvexPolygon(
@@ -819,6 +832,7 @@ ColorF bottombangs(
         existingColor,
         BOTTOM_BANGS_COLOR,
         input.antialiasingLevel,
+        RasterPass::BottomBangs,
         [](float sampleX, float sampleY) {
             sampleX += 0.05f;
             return
