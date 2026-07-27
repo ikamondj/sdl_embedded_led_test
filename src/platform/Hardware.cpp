@@ -279,6 +279,10 @@ void useDesktopVisual(bool enabled) {
   VisualOutput::useDesktop(enabled);
 }
 
+void useFpsLogging(bool enabled) {
+  VisualOutput::useFpsLogging(enabled);
+}
+
 Vec2 readJoystick(std::size_t index) {
   if (index > 1) {
     return {};

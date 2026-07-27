@@ -21,6 +21,9 @@ constexpr int WINDOW_SCALE = 16;
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 SDL_Texture* texture = nullptr;
+bool fpsLogging = false;
+std::uint64_t fpsWindowStart = 0;
+std::uint32_t fpsFrameCount = 0;
 std::array<std::uint32_t,
            Hardware::MATRIX_WIDTH * Hardware::MATRIX_HEIGHT> framebuffer{};
 
@@ -139,6 +142,29 @@ bool initialize() {
   if (!renderer) {
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
   }
+
+  if (fpsLogging) {
+    SDL_RendererInfo rendererInfo{};
+    if (SDL_GetRendererInfo(renderer, &rendererInfo) == 0) {
+      std::cout << "SDL renderer: "
+                << (rendererInfo.name ? rendererInfo.name : "unknown")
+                << ", accelerated="
+                << ((rendererInfo.flags & SDL_RENDERER_ACCELERATED) ? "yes" : "no")
+                << ", vsync="
+                << ((rendererInfo.flags & SDL_RENDERER_PRESENTVSYNC) ? "yes" : "no")
+                << '\n';
+    }
+    const int displayIndex = SDL_GetWindowDisplayIndex(window);
+    SDL_DisplayMode displayMode{};
+    if (displayIndex >= 0 &&
+        SDL_GetCurrentDisplayMode(displayIndex, &displayMode) == 0) {
+      std::cout << "SDL display mode: " << displayMode.w << 'x'
+                << displayMode.h << " @ " << displayMode.refresh_rate
+                << " Hz\n";
+    }
+    fpsWindowStart = SDL_GetPerformanceCounter();
+    fpsFrameCount = 0;
+  }
   if (!renderer) {
     std::cerr << "SDL_CreateRenderer failed: " << SDL_GetError() << '\n';
     return false;
@@ -191,7 +217,26 @@ bool present() {
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, nullptr, nullptr);
   SDL_RenderPresent(renderer);
+
+  if (fpsLogging) {
+    ++fpsFrameCount;
+    const std::uint64_t now = SDL_GetPerformanceCounter();
+    const std::uint64_t frequency = SDL_GetPerformanceFrequency();
+    const double elapsed =
+        static_cast<double>(now - fpsWindowStart) /
+        static_cast<double>(frequency);
+    if (elapsed >= 1.0) {
+      std::cout << "SDL FPS: "
+                << static_cast<double>(fpsFrameCount) / elapsed << '\n';
+      fpsWindowStart = now;
+      fpsFrameCount = 0;
+    }
+  }
   return true;
+}
+
+void useFpsLogging(bool enabled) {
+  fpsLogging = enabled;
 }
 
 }  // namespace VisualSDL

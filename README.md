@@ -106,6 +106,15 @@ Normal runs load that file automatically when present and skip raster
 evaluation for pixels that stayed black throughout the sweep. Delete the file
 to disable the optimization.
 
+Pass `-f` with SDL mode to print average completed presentation FPS once per
+second. It also reports the renderer backend, acceleration/VSync flags, and
+active display refresh rate at startup:
+
+```bash
+./build-pi/bin/Hub75Simulator -d -f
+./build-pi/bin/Hub75Simulator -d -t -f
+```
+
 When launched from SSH, `-d` automatically discovers the local Wayland or X11
 desktop socket and the common Xauthority locations. Run it as the same user
 that owns the logged-in desktop session; a different user may not have
