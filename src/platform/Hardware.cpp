@@ -94,7 +94,7 @@ bool openInputDeviceAtIndex(int deviceIndex) {
   const char* name = SDL_JoystickName(rawJoystick);
   std::cout << "Unmapped joystick connected using raw fallback: "
             << (name != nullptr ? name : "Unknown joystick") << '\n'
-            << "  Raw mapping: axes 0/1 and 2/3; buttons 0/1/2/3.\n";
+            << "  Raw mapping: axes 0/1 and 2/3; buttons X1-X5; axis 4=X6.\n";
   return true;
 }
 
@@ -186,6 +186,9 @@ SDL_GameControllerButton controllerButtonFor(FaceButton button) {
     case FaceButton::Two: return SDL_CONTROLLER_BUTTON_B;
     case FaceButton::Three: return SDL_CONTROLLER_BUTTON_X;
     case FaceButton::Four: return SDL_CONTROLLER_BUTTON_Y;
+    case FaceButton::Five: return SDL_CONTROLLER_BUTTON_RIGHTSHOULDER;
+    case FaceButton::Six: return SDL_CONTROLLER_BUTTON_INVALID;
+    case FaceButton::Seven: return SDL_CONTROLLER_BUTTON_RIGHTSTICK;
   }
   return SDL_CONTROLLER_BUTTON_INVALID;
 }
@@ -196,6 +199,9 @@ SDL_Scancode keyboardButtonFor(FaceButton button) {
     case FaceButton::Two: return SDL_SCANCODE_2;
     case FaceButton::Three: return SDL_SCANCODE_3;
     case FaceButton::Four: return SDL_SCANCODE_4;
+    case FaceButton::Five: return SDL_SCANCODE_5;
+    case FaceButton::Six: return SDL_SCANCODE_6;
+    case FaceButton::Seven: return SDL_SCANCODE_7;
   }
   return SDL_SCANCODE_UNKNOWN;
 }
@@ -224,7 +230,8 @@ bool initialize() {
       << "Controls:\n"
       << "  Joystick 1: left gamepad stick or WASD\n"
       << "  Joystick 2: right gamepad stick or arrow keys\n"
-      << "  Face buttons: gamepad A/B/X/Y or number keys 1/2/3/4\n"
+      << "  Buttons X1-X5: raw controller buttons 1-5 or keys 1-5\n"
+      << "  Button X6: raw controller axis 4 or key 6\n"
       << "  Escape or close window: quit\n";
 
   return true;
@@ -262,6 +269,17 @@ void poll() {
           std::cout << "Gamepad disconnected.\n";
           closeActiveJoystick();
           openFirstAvailableInputDevice();
+        }
+        break;
+
+      case SDL_JOYBUTTONDOWN:
+      case SDL_JOYBUTTONUP:
+        if (event.jbutton.which == activeJoystickInstanceId) {
+          //std::cout << "Raw button "
+          //          << static_cast<unsigned int>(event.jbutton.button)
+          //          << (event.type == SDL_JOYBUTTONDOWN
+          //                  ? ": pressed\n"
+          //                  : ": released\n");
         }
         break;
 
@@ -313,16 +331,28 @@ bool readFaceButton(FaceButton button) {
 
   bool gamepadPressed = false;
 
-  if (controller != nullptr) {
-    const SDL_GameControllerButton gamepadButton = controllerButtonFor(button);
-    gamepadPressed =
-        gamepadButton != SDL_CONTROLLER_BUTTON_INVALID
-        && SDL_GameControllerGetButton(controller, gamepadButton) != 0;
-  } else if (rawJoystick != nullptr) {
-    const int rawButtonIndex = static_cast<int>(button);
-    gamepadPressed =
-        rawButtonIndex < SDL_JoystickNumButtons(rawJoystick)
-        && SDL_JoystickGetButton(rawJoystick, rawButtonIndex) != 0;
+  SDL_Joystick* joystick = controller != nullptr
+      ? SDL_GameControllerGetJoystick(controller)
+      : rawJoystick;
+
+  if (button == FaceButton::Six) {
+    // This controller exposes X6 as a click-like raw axis: positive is pressed
+    // and negative is released.
+    gamepadPressed = joystick != nullptr
+        && SDL_JoystickNumAxes(joystick) > 4
+        && SDL_JoystickGetAxis(joystick, 4) > 0;
+  } else if (joystick != nullptr) {
+    const int rawButtonIndex = button == FaceButton::Seven
+        ? 8
+        : static_cast<int>(button);
+    if (rawButtonIndex < SDL_JoystickNumButtons(joystick)) {
+      gamepadPressed = SDL_JoystickGetButton(joystick, rawButtonIndex) != 0;
+    } else if (controller != nullptr) {
+      const SDL_GameControllerButton gamepadButton = controllerButtonFor(button);
+      gamepadPressed =
+          gamepadButton != SDL_CONTROLLER_BUTTON_INVALID
+          && SDL_GameControllerGetButton(controller, gamepadButton) != 0;
+    }
   }
 
   return keyboardPressed || gamepadPressed;

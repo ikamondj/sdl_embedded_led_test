@@ -1,4 +1,5 @@
 #include "RasterRenderer.h"
+#include "ControlHelpers.h"
 
 #include <algorithm>
 #include <cmath>
@@ -71,6 +72,8 @@ constexpr ColorF INNER_PUPIL_COLOR{
     0.0f,
     0.0f
 };
+
+
 
 ColorF eyeSample(
     float x,
@@ -291,10 +294,10 @@ ColorF eyeSample(
 
         const float openUpper = dlerp(
             defOpen, 
-            contenta, 
+            sleepy, 
             defOpen, 
             fullopen, 
-            sleepy, input.joystick1.x, input.joystick1.y);
+            contenta, input.joystick1.x, input.joystick1.y);
             
 
         const float flatBlink =
@@ -346,10 +349,10 @@ ColorF eyeSample(
 
         const float openLower = dlerp(
             defopen, 
-            defopen, 
+            sleepy, 
             slimopen,
             fullopen, 
-            sleepy, input.joystick1.x, input.joystick1.y);
+            defopen, input.joystick1.x, input.joystick1.y);
 
         
 
@@ -390,8 +393,8 @@ ColorF eyeSample(
 
     auto browPredicate = [blink, blinkability, input](float x, float y) {
         float blinkz = blink * blinkability;
-        float bigEyeOffsetX = dlerp(0.0f, 0.081f, -0.17f, -.1f, 0.0f, input.joystick1.x, input.joystick1.y);
-        float bigEyeOffsetY = dlerp(0.0f, 0.0f, -0.14f, -.0315f, -0.091f, input.joystick1.x, input.joystick1.y);
+        float bigEyeOffsetX = dlerp(0.0f, 0.0f, -0.17f, -.1f, 0.081f, input.joystick1.x, input.joystick1.y);
+        float bigEyeOffsetY = dlerp(0.0f, -0.091f, -0.14f, -.0315f, 0.0f, input.joystick1.x, input.joystick1.y);
         bool inbotbrow = inTri(x,y,
             .560f+blinkz*.15f+bigEyeOffsetX * (1-blinkz), .391f-blinkz*.15f+bigEyeOffsetY * (1-blinkz),
             .500f+blinkz*.15f+bigEyeOffsetX * (1-blinkz), .577f-blinkz*.15f+bigEyeOffsetY * (1-blinkz),
@@ -584,11 +587,14 @@ ColorF eyeSample(
     };
 
 
-    const float scleraRadiusSqr = .0035f;
+    const float scleraRadiusSqr = clerp4(.0005f, .0035f, 0.008f, 0.021f, input.pupState);
+    const float pupilRadiusSqr = clerp4(0.007f, 0.01f, 0.03f, 0.03f, input.pupState);
+    const float innerPupilRadiusSqr = clerp4(0.002f, 0.0001f, 0.009f, 0.001f, input.pupState);
+
 
     const auto pupilPredicate =
         makeEyeCirclePredicate(
-            PUPIL_RADIUS_SQR);
+            pupilRadiusSqr);
 
     const auto scleraPredicate =
         makeEyeCirclePredicate(
@@ -596,7 +602,7 @@ ColorF eyeSample(
 
     const auto innerPupilPredicate =
         makeEyeCirclePredicate(
-            INNER_PUPIL_RADIUS_SQR);
+            innerPupilRadiusSqr);
 
     /*
      * Component order matters because each later component replaces a

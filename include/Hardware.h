@@ -23,7 +23,10 @@ enum class FaceButton : std::uint8_t {
   One = 0,
   Two,
   Three,
-  Four
+  Four,
+  Five,
+  Six,
+  Seven
 };
 
 // Platform lifetime -----------------------------------------------------------

@@ -26,9 +26,10 @@ struct RenderInputs {
   JoystickState joystick1{};
   JoystickState joystick2{};
 
-  std::array<bool, 4> faceButtons{};
+  std::array<bool, 7> faceButtons{};
   int antialiasingLevel = 1;
   bool disableBlink = false;
+  float pupState = 0;
 };
 
 enum class RasterPass : std::uint8_t {
