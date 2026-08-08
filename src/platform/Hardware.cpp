@@ -19,6 +19,7 @@ SDL_Joystick* rawJoystick = nullptr;
 SDL_JoystickID activeJoystickInstanceId = -1;
 
 bool running = false;
+bool inputLoggingEnabled = false;
 
 float clampAxis(float value) {
   return std::clamp(value, -1.0f, 1.0f);
@@ -274,12 +275,35 @@ void poll() {
 
       case SDL_JOYBUTTONDOWN:
       case SDL_JOYBUTTONUP:
-        if (event.jbutton.which == activeJoystickInstanceId) {
-          //std::cout << "Raw button "
-          //          << static_cast<unsigned int>(event.jbutton.button)
-          //          << (event.type == SDL_JOYBUTTONDOWN
-          //                  ? ": pressed\n"
-          //                  : ": released\n");
+        if (inputLoggingEnabled
+            && event.jbutton.which == activeJoystickInstanceId) {
+          std::cout << "Raw button "
+                    << static_cast<unsigned int>(event.jbutton.button)
+                    << (event.type == SDL_JOYBUTTONDOWN
+                            ? ": pressed\n"
+                            : ": released\n");
+        }
+        break;
+
+      case SDL_JOYAXISMOTION:
+        if (inputLoggingEnabled
+            && event.jaxis.which == activeJoystickInstanceId
+            && event.jaxis.axis >= 4) {
+          std::cout << "Raw axis "
+                    << static_cast<unsigned int>(event.jaxis.axis)
+                    << " changed: " << event.jaxis.value
+                    << " (normalized "
+                    << normalizeControllerAxis(event.jaxis.value) << ")\n";
+        }
+        break;
+
+      case SDL_JOYHATMOTION:
+        if (inputLoggingEnabled
+            && event.jhat.which == activeJoystickInstanceId) {
+          std::cout << "Raw hat "
+                    << static_cast<unsigned int>(event.jhat.hat)
+                    << " changed: "
+                    << static_cast<unsigned int>(event.jhat.value) << '\n';
         }
         break;
 
@@ -299,6 +323,10 @@ void useDesktopVisual(bool enabled) {
 
 void useFpsLogging(bool enabled) {
   VisualOutput::useFpsLogging(enabled);
+}
+
+void useInputLogging(bool enabled) {
+  inputLoggingEnabled = enabled;
 }
 
 void useVsync(bool enabled) {

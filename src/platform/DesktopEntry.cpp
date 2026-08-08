@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
   bool threadedRenderer = false;
   bool precomputeMask = false;
   bool fpsLogging = false;
+  bool inputLogging = false;
   bool vsync = false;
   bool windowedVisual = false;
   double frameRateLimit = 0.0;
@@ -31,6 +32,8 @@ int main(int argc, char** argv) {
       precomputeMask = true;
     } else if (argument == "-f") {
       fpsLogging = true;
+    } else if (argument == "-l") {
+      inputLogging = true;
     } else if (argument == "-v") {
       vsync = true;
     } else if (argument == "-s") {
@@ -50,13 +53,14 @@ int main(int argc, char** argv) {
       }
     } else {
       std::cerr << "Usage: " << argv[0]
-                << " [-d] [-s] [-v] [-t] [-p] [-f] [-fps [number]]\n"
+                << " [-d] [-s] [-v] [-t] [-p] [-f] [-l] [-fps [number]]\n"
                 << "  -d  Use fullscreen SDL visual output.\n"
                 << "  -s  Use a resizable 64x32 SDL window.\n"
                 << "  -v  Enable SDL presentation VSync.\n"
                 << "  -t  Use the persistent four-core raster pool.\n"
                 << "  -p  Rebuild the offline pixel visibility mask and exit.\n"
                 << "  -f  Report average SDL presentation FPS once per second.\n"
+                << "  -l  Log raw button and non-stick axis changes.\n"
                 << "  -fps [N]  Limit to N FPS; omit N for uncapped.\n";
       return 2;
     }
@@ -82,6 +86,7 @@ int main(int argc, char** argv) {
 
   Hardware::useDesktopVisual(desktopVisual);
   Hardware::useFpsLogging(fpsLogging);
+  Hardware::useInputLogging(inputLogging);
   Hardware::useVsync(vsync);
   Hardware::useWindowedVisual(windowedVisual);
   setThreadedRendering(threadedRenderer);

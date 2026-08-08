@@ -49,6 +49,13 @@ cmake --build build --config Release --parallel
 
 SDL2 uses its standardized GameController mapping, so Xbox-style, PlayStation-style, and many generic controllers expose the same two-stick/four-face-button interface. If a device has no SDL mapping, the simulator falls back to raw joystick axes 0/1 and 2/3 plus raw buttons 0/1/2/3. Controller hot-plugging is supported.
 
+Pass `-l` to log every raw button press/release, hat change, and raw axis
+change from axis 4 onward. The two main sticks on axes 0–3 are excluded:
+
+```powershell
+.\build\bin\Hub75Simulator.exe -l
+```
+
 ## Raspberry Pi 4B / Ubuntu build
 
 Connect one 64x32 HUB75 panel through an Adafruit RGB Matrix Bonnet (the

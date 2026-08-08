@@ -40,6 +40,7 @@ bool isRunning();
 // false keeps the default HUB75 GPIO output.
 void useDesktopVisual(bool enabled);
 void useFpsLogging(bool enabled);
+void useInputLogging(bool enabled);
 void useVsync(bool enabled);
 void useWindowedVisual(bool enabled);
 
