@@ -18,7 +18,7 @@ bool initialize() {
   options.cols = Hardware::MATRIX_WIDTH;
   options.chain_length = 1;
   options.parallel = 1;
-  options.hardware_mapping = "adafruit-hat";
+  options.hardware_mapping = "regular";
 
   rgb_matrix::RuntimeOptions runtime;
   // Pi 4 generally needs a larger GPIO slowdown than earlier boards.

@@ -738,7 +738,7 @@ bool bottomTooth(float x, float y, float mouthBot, float mouthTop, const RenderI
 
 bool tongue(float x, float y, float mouthTop, const RenderInputs& input) {
     float top = std::min(mouthTop,dlerp(1, 1, 1, 1, 1, input.joystick2.x, input.joystick2.y));
-    float bottomdef = -.1f*sqrtf(.04-x*x)-.7f;
+    float bottomdef = -.25f*sqrtf(.04-x*x)-.7f;
     float bottom = dlerp(1.0f, 1.0f, bottomdef, 1.0f, 1.0f, input.joystick2.x, input.joystick2.y);
     return y <= top && y >= bottom;
 }

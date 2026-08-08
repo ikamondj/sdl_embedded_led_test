@@ -162,8 +162,12 @@ void loop() {
   x_3_4 = smoothDamp4(x_3_4, pupstate, x_3_4_v, .1f, deltaSeconds);
   x_1_2 = smoothDamp4(x_1_2, _1_2_target, x_1_2_v, .1f, deltaSeconds);
   input.joystick1.x = clerp4(0.0f, 1.0f, 0.0f, -1.0f, x_5_6);
+  float rups = clerp4(0.0f, 0.0f, 0.6f, 0.0f, x_5_6) * clerp4(0.0f, 1.0f, 0.0f, 1.0f, x_1_2);
   input.joystick1.x *= clerp4(1.0f, 0.5f, 0.5f, 0.5f, x_1_2);
-  input.joystick1.y = clerp4(0.0f, 0.0f, -1.0f, 0.0f, x_5_6) + clerp4(0.0f, 1.0f, 0.0f, -1.0f, x_1_2);
+  input.joystick1.x += rups;
+  float ups = clerp4(1.0f, 1.0f, 0.5f, 1.0f, x_5_6);
+  
+  input.joystick1.y = clerp4(0.0f, 0.0f, -1.0f, 0.0f, x_5_6) + clerp4(0.0f, ups, 0.0f, -1.0f, x_1_2);
   
   
   input.pupState = x_3_4;
