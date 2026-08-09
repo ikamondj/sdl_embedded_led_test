@@ -14,6 +14,7 @@ namespace Hardware {
 namespace {
 
 constexpr float CONTROLLER_DEADZONE = 0.15f;
+constexpr Sint16 CONTROLLER_TRIGGER_BUTTON_THRESHOLD = 16384;
 
 SDL_GameController* controller = nullptr;
 SDL_Joystick* rawJoystick = nullptr;
@@ -352,9 +353,9 @@ SDL_GameControllerButton controllerButtonFor(FaceButton button) {
     case FaceButton::Two: return SDL_CONTROLLER_BUTTON_B;
     case FaceButton::Three: return SDL_CONTROLLER_BUTTON_X;
     case FaceButton::Four: return SDL_CONTROLLER_BUTTON_Y;
-    case FaceButton::Five: return SDL_CONTROLLER_BUTTON_RIGHTSHOULDER;
+    case FaceButton::Five: return SDL_CONTROLLER_BUTTON_LEFTSHOULDER;
     case FaceButton::Six: return SDL_CONTROLLER_BUTTON_INVALID;
-    case FaceButton::Seven: return SDL_CONTROLLER_BUTTON_RIGHTSTICK;
+    case FaceButton::Seven: return SDL_CONTROLLER_BUTTON_LEFTSTICK;
   }
   return SDL_CONTROLLER_BUTTON_INVALID;
 }
@@ -577,27 +578,30 @@ bool readFaceButton(FaceButton button) {
 
   bool gamepadPressed = false;
 
-  SDL_Joystick* joystick = controller != nullptr
-      ? SDL_GameControllerGetJoystick(controller)
-      : rawJoystick;
-
-  const int rawAxisIndex = rawAxisIndexFor(button);
-  if (rawAxisIndex >= 0) {
-    // X6 is a click-like raw axis: positive is pressed and negative is
-    // released. Its raw index differs between Linux and Windows.
-    gamepadPressed = joystick != nullptr
-        && SDL_JoystickNumAxes(joystick) > rawAxisIndex
-        && SDL_JoystickGetAxis(joystick, rawAxisIndex) > 0;
-  } else if (joystick != nullptr) {
-    const int rawButtonIndex = rawButtonIndexFor(button);
-    if (rawButtonIndex >= 0
-        && rawButtonIndex < SDL_JoystickNumButtons(joystick)) {
-      gamepadPressed = SDL_JoystickGetButton(joystick, rawButtonIndex) != 0;
-    } else if (controller != nullptr) {
-      const SDL_GameControllerButton gamepadButton = controllerButtonFor(button);
+  if (controller != nullptr) {
+    if (button == FaceButton::Six) {
+      gamepadPressed = SDL_GameControllerGetAxis(
+          controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT)
+          > CONTROLLER_TRIGGER_BUTTON_THRESHOLD;
+    } else {
+      const SDL_GameControllerButton gamepadButton =
+          controllerButtonFor(button);
       gamepadPressed =
           gamepadButton != SDL_CONTROLLER_BUTTON_INVALID
           && SDL_GameControllerGetButton(controller, gamepadButton) != 0;
+    }
+  } else if (rawJoystick != nullptr) {
+    const int rawAxisIndex = rawAxisIndexFor(button);
+    if (rawAxisIndex >= 0) {
+      gamepadPressed = SDL_JoystickNumAxes(rawJoystick) > rawAxisIndex
+          && SDL_JoystickGetAxis(rawJoystick, rawAxisIndex) > 0;
+    } else {
+      const int rawButtonIndex = rawButtonIndexFor(button);
+      if (rawButtonIndex >= 0
+          && rawButtonIndex < SDL_JoystickNumButtons(rawJoystick)) {
+        gamepadPressed =
+            SDL_JoystickGetButton(rawJoystick, rawButtonIndex) != 0;
+      }
     }
   }
 
