@@ -23,6 +23,20 @@ bool running = false;
 bool inputLoggingEnabled = false;
 bool joystickLoggingEnabled = false;
 bool activeUsesAdaptiveLinuxProfile = false;
+std::uint16_t brightnessScale = 65535;
+
+Rgb applyBrightness(Rgb color) {
+  const auto scaleChannel = [](std::uint8_t channel) {
+    return static_cast<std::uint8_t>(
+        (static_cast<std::uint32_t>(channel) * brightnessScale + 32767u)
+        / 65535u);
+  };
+  return {
+      scaleChannel(color.r),
+      scaleChannel(color.g),
+      scaleChannel(color.b),
+  };
+}
 
 bool deviceMatchesAdaptiveLinuxProfile(int deviceIndex) {
 #if defined(__linux__)
@@ -599,11 +613,17 @@ void delayMs(std::uint32_t milliseconds) {
 }
 
 void clearLeds(Rgb color) {
-  VisualOutput::clear(color);
+  VisualOutput::clear(applyBrightness(color));
 }
 
 void setLed(int x, int y, Rgb color) {
-  VisualOutput::setPixel(x, y, color);
+  VisualOutput::setPixel(x, y, applyBrightness(color));
+}
+
+void setBrightness(float scale) {
+  const float clamped = std::clamp(scale, 0.1f, 1.0f);
+  brightnessScale = static_cast<std::uint16_t>(
+      std::lround(clamped * 65535.0f));
 }
 
 void presentLeds() {

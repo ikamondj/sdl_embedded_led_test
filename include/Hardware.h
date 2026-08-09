@@ -60,6 +60,7 @@ void delayMs(std::uint32_t milliseconds);
 // frame to the simulated panel, analogous to finishing a HUB75 frame update.
 void clearLeds(Rgb color = {});
 void setLed(int x, int y, Rgb color);
+void setBrightness(float scale);
 void presentLeds();
 
 }  // namespace Hardware

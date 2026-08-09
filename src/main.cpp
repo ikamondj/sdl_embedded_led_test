@@ -101,6 +101,16 @@ Hardware::Vec2 j2current{};
 float x_5_6, x_3_4, x_1_2;
 float x_5_6_v, x_3_4_v, x_1_2_v;
 float pupstate = 1;
+float shutdownHoldSeconds = 0.0f;
+float brightness = 1.0f;
+bool rendererBlackout = false;
+bool blackoutWakeArmed = false;
+bool blackoutClickWasPressed = false;
+
+constexpr float SHUTDOWN_HOLD_SECONDS = 3.0f;
+constexpr float BRIGHTNESS_MIN = 0.1f;
+constexpr float BRIGHTNESS_MAX = 1.0f;
+constexpr float BRIGHTNESS_FULL_RANGE_SECONDS = 4.0f;
 
 
 void loop() {
@@ -109,6 +119,28 @@ void loop() {
     return;
   }
   const float deltaSeconds = deltaTimer.tick();
+
+  if (rendererBlackout) {
+    const bool clickPressed =
+        Hardware::readFaceButton(Hardware::FaceButton::Seven);
+    input.faceButtons[6] = clickPressed;
+
+    if (!clickPressed) {
+      blackoutWakeArmed = true;
+    }
+
+    if (blackoutWakeArmed
+        && clickPressed
+        && !blackoutClickWasPressed) {
+      rendererBlackout = false;
+      blackoutWakeArmed = false;
+    } else {
+      blackoutClickWasPressed = clickPressed;
+      Hardware::delayMs(10);
+      return;
+    }
+  }
+
   j1current = hardConvert(input.joystick1);
   j2current = hardConvert(input.joystick2);
 
@@ -137,6 +169,41 @@ void loop() {
   input.faceButtons[5] = Hardware::readFaceButton(Hardware::FaceButton::Six);
   input.faceButtons[6] = Hardware::readFaceButton(Hardware::FaceButton::Seven);
   input.timeSeconds = static_cast<float>(Hardware::millis()) * 0.001f;
+
+  const bool shutdownChord =
+      input.faceButtons[4]
+      && input.faceButtons[5]
+      && input.faceButtons[6];
+  shutdownHoldSeconds = shutdownChord
+      ? shutdownHoldSeconds + deltaSeconds
+      : 0.0f;
+
+  if (shutdownHoldSeconds >= SHUTDOWN_HOLD_SECONDS) {
+    rendererBlackout = true;
+    blackoutWakeArmed = false;
+    blackoutClickWasPressed = input.faceButtons[6];
+    shutdownHoldSeconds = 0.0f;
+    Hardware::clearLeds({0, 0, 0});
+    Hardware::presentLeds();
+    Hardware::delayMs(10);
+    return;
+  }
+
+  const bool brightnessChord =
+      input.faceButtons[0]
+      && input.faceButtons[1]
+      && input.faceButtons[2]
+      && input.faceButtons[3];
+  if (brightnessChord) {
+    constexpr float BRIGHTNESS_RATE =
+        (BRIGHTNESS_MAX - BRIGHTNESS_MIN)
+        / BRIGHTNESS_FULL_RANGE_SECONDS;
+    brightness = std::clamp(
+        brightness + j2target.y * BRIGHTNESS_RATE * deltaSeconds,
+        BRIGHTNESS_MIN,
+        BRIGHTNESS_MAX);
+    Hardware::setBrightness(brightness);
+  }
 
   if (input.faceButtons[2] && !f2) {
     if (input.faceButtons[3]) {
