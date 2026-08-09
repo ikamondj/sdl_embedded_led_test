@@ -20,6 +20,31 @@ SDL_JoystickID activeJoystickInstanceId = -1;
 
 bool running = false;
 bool inputLoggingEnabled = false;
+bool joystickLoggingEnabled = false;
+
+void logJoystickIdentity(SDL_Joystick* joystick) {
+  if (joystick == nullptr
+      || (!inputLoggingEnabled && !joystickLoggingEnabled)) {
+    return;
+  }
+
+  char guid[33]{};
+  SDL_JoystickGetGUIDString(SDL_JoystickGetGUID(joystick), guid, sizeof(guid));
+  std::cout << "Input device identity:\n"
+            << "  name: "
+            << (SDL_JoystickName(joystick) != nullptr
+                    ? SDL_JoystickName(joystick)
+                    : "Unknown joystick") << '\n'
+            << "  GUID: " << guid << '\n'
+            << "  vendor/product/version: "
+            << SDL_JoystickGetVendor(joystick) << '/'
+            << SDL_JoystickGetProduct(joystick) << '/'
+            << SDL_JoystickGetProductVersion(joystick) << '\n'
+            << "  axes/buttons/hats: "
+            << SDL_JoystickNumAxes(joystick) << '/'
+            << SDL_JoystickNumButtons(joystick) << '/'
+            << SDL_JoystickNumHats(joystick) << '\n';
+}
 
 float clampAxis(float value) {
   return std::clamp(value, -1.0f, 1.0f);
@@ -82,6 +107,7 @@ bool openInputDeviceAtIndex(int deviceIndex) {
     const char* name = SDL_GameControllerName(controller);
     std::cout << "Mapped gamepad connected: "
               << (name != nullptr ? name : "Unknown controller") << '\n';
+    logJoystickIdentity(joystick);
     return true;
   }
 
@@ -96,6 +122,7 @@ bool openInputDeviceAtIndex(int deviceIndex) {
   std::cout << "Unmapped joystick connected using raw fallback: "
             << (name != nullptr ? name : "Unknown joystick") << '\n'
             << "  Raw mapping: axes 0/1 and 2/3; buttons X1-X5; axis 4=X6.\n";
+  logJoystickIdentity(rawJoystick);
   return true;
 }
 
@@ -311,9 +338,9 @@ void poll() {
         break;
 
       case SDL_JOYAXISMOTION:
-        if (inputLoggingEnabled
-            && event.jaxis.which == activeJoystickInstanceId
-            && event.jaxis.axis >= 4) {
+        if (event.jaxis.which == activeJoystickInstanceId
+            && ((event.jaxis.axis < 4 && joystickLoggingEnabled)
+                || (event.jaxis.axis >= 4 && inputLoggingEnabled))) {
           std::cout << "Raw axis "
                     << static_cast<unsigned int>(event.jaxis.axis)
                     << " changed: " << event.jaxis.value
@@ -352,6 +379,10 @@ void useFpsLogging(bool enabled) {
 
 void useInputLogging(bool enabled) {
   inputLoggingEnabled = enabled;
+}
+
+void useJoystickLogging(bool enabled) {
+  joystickLoggingEnabled = enabled;
 }
 
 void useVsync(bool enabled) {

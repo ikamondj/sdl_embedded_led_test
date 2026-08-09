@@ -41,6 +41,7 @@ bool isRunning();
 void useDesktopVisual(bool enabled);
 void useFpsLogging(bool enabled);
 void useInputLogging(bool enabled);
+void useJoystickLogging(bool enabled);
 void useVsync(bool enabled);
 void useWindowedVisual(bool enabled);
 
