@@ -46,6 +46,77 @@ void logJoystickIdentity(SDL_Joystick* joystick) {
             << SDL_JoystickNumHats(joystick) << '\n';
 }
 
+void logAllInputDevices() {
+  if (!inputLoggingEnabled && !joystickLoggingEnabled) {
+    return;
+  }
+
+  SDL_version linkedVersion{};
+  SDL_GetVersion(&linkedVersion);
+  std::cout << "SDL input diagnostics:\n"
+            << "  compiled SDL: " << SDL_MAJOR_VERSION << '.'
+            << SDL_MINOR_VERSION << '.' << SDL_PATCHLEVEL << '\n'
+            << "  linked SDL: " << static_cast<int>(linkedVersion.major) << '.'
+            << static_cast<int>(linkedVersion.minor) << '.'
+            << static_cast<int>(linkedVersion.patch) << '\n';
+
+  const int joystickCount = SDL_NumJoysticks();
+  std::cout << "  detected joystick interfaces: " << joystickCount << '\n';
+
+  for (int index = 0; index < joystickCount; ++index) {
+    char guid[33]{};
+    SDL_JoystickGetGUIDString(
+        SDL_JoystickGetDeviceGUID(index), guid, sizeof(guid));
+    const char* deviceName = SDL_JoystickNameForIndex(index);
+    std::cout << "Joystick interface " << index << ":\n"
+              << "  name: "
+              << (deviceName != nullptr ? deviceName : "Unknown joystick") << '\n'
+              << "  GUID: " << guid << '\n'
+              << "  mapped game controller: "
+              << (SDL_IsGameController(index) ? "yes" : "no") << '\n';
+
+#if SDL_VERSION_ATLEAST(2, 24, 0)
+    const char* devicePath = SDL_JoystickPathForIndex(index);
+    std::cout << "  path: "
+              << (devicePath != nullptr ? devicePath : "unavailable") << '\n';
+#endif
+
+    SDL_Joystick* joystick = SDL_JoystickOpen(index);
+    if (joystick == nullptr) {
+      std::cout << "  open failed: " << SDL_GetError() << '\n';
+      continue;
+    }
+
+    std::cout << "  instance ID: " << SDL_JoystickInstanceID(joystick) << '\n'
+              << "  vendor/product/version: "
+              << SDL_JoystickGetVendor(joystick) << '/'
+              << SDL_JoystickGetProduct(joystick) << '/'
+              << SDL_JoystickGetProductVersion(joystick) << '\n'
+              << "  axes/buttons/hats/trackballs: "
+              << SDL_JoystickNumAxes(joystick) << '/'
+              << SDL_JoystickNumButtons(joystick) << '/'
+              << SDL_JoystickNumHats(joystick) << '/'
+              << SDL_JoystickNumBalls(joystick) << '\n';
+
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+    const char* serial = SDL_JoystickGetSerial(joystick);
+    std::cout << "  serial: "
+              << (serial != nullptr && serial[0] != '\0'
+                      ? serial
+                      : "unavailable") << '\n';
+#endif
+
+#if SDL_VERSION_ATLEAST(2, 0, 9)
+    char* mapping = SDL_GameControllerMappingForDeviceIndex(index);
+    std::cout << "  SDL mapping: "
+              << (mapping != nullptr ? mapping : "unavailable") << '\n';
+    SDL_free(mapping);
+#endif
+
+    SDL_JoystickClose(joystick);
+  }
+}
+
 float clampAxis(float value) {
   return std::clamp(value, -1.0f, 1.0f);
 }
@@ -120,8 +191,12 @@ bool openInputDeviceAtIndex(int deviceIndex) {
   activeJoystickInstanceId = SDL_JoystickInstanceID(rawJoystick);
   const char* name = SDL_JoystickName(rawJoystick);
   std::cout << "Unmapped joystick connected using raw fallback: "
-            << (name != nullptr ? name : "Unknown joystick") << '\n'
-            << "  Raw mapping: axes 0/1 and 2/3; buttons X1-X5; axis 4=X6.\n";
+            << (name != nullptr ? name : "Unknown joystick") << '\n';
+#if defined(__linux__)
+  std::cout << "  Raw mapping: axes 0/1 for the mouth; axis 2=X6.\n";
+#else
+  std::cout << "  Raw mapping: axes 0/1 for the mouth; axis 4=X6.\n";
+#endif
   logJoystickIdentity(rawJoystick);
   return true;
 }
@@ -245,7 +320,7 @@ int rawButtonIndexFor(FaceButton button) {
     case FaceButton::Three: return 4;  // X1
     case FaceButton::Four: return 5;   // X2
     case FaceButton::Five: return 1;   // X5
-    case FaceButton::Six: return 0;    // X6
+    case FaceButton::Six: return -1;   // X6 is axis 2
     case FaceButton::Seven: return 6;  // Joystick click
   }
   return -1;
@@ -259,6 +334,17 @@ int rawButtonIndexFor(FaceButton button) {
 #endif
 }
 
+int rawAxisIndexFor(FaceButton button) {
+  if (button != FaceButton::Six) {
+    return -1;
+  }
+#if defined(__linux__)
+  return 2;
+#else
+  return 4;
+#endif
+}
+
 }  // namespace
 
 bool initialize() {
@@ -269,6 +355,8 @@ bool initialize() {
     std::cerr << "SDL_Init failed: " << SDL_GetError() << '\n';
     return false;
   }
+
+  logAllInputDevices();
 
   if (!VisualOutput::initialize()) {
     shutdown();
@@ -419,16 +507,14 @@ bool readFaceButton(FaceButton button) {
       ? SDL_GameControllerGetJoystick(controller)
       : rawJoystick;
 
-#if !defined(__linux__)
-  if (button == FaceButton::Six) {
-    // This controller exposes X6 as a click-like raw axis: positive is pressed
-    // and negative is released.
+  const int rawAxisIndex = rawAxisIndexFor(button);
+  if (rawAxisIndex >= 0) {
+    // X6 is a click-like raw axis: positive is pressed and negative is
+    // released. Its raw index differs between Linux and Windows.
     gamepadPressed = joystick != nullptr
-        && SDL_JoystickNumAxes(joystick) > 4
-        && SDL_JoystickGetAxis(joystick, 4) > 0;
-  } else
-#endif
-  if (joystick != nullptr) {
+        && SDL_JoystickNumAxes(joystick) > rawAxisIndex
+        && SDL_JoystickGetAxis(joystick, rawAxisIndex) > 0;
+  } else if (joystick != nullptr) {
     const int rawButtonIndex = rawButtonIndexFor(button);
     if (rawButtonIndex >= 0
         && rawButtonIndex < SDL_JoystickNumButtons(joystick)) {
