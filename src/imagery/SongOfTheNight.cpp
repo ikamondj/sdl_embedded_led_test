@@ -675,12 +675,14 @@ float mouthTop(float x, const RenderInputs& input) {
     float cx = x * (1-0.544355294118f*(1-leftness));
     float circleMouth = sqrt(.15f-cx*cx)-.35f;
     float uwumouth = 0.3f*x*x-0.344f+0.1f*cosf(5*x);
+    constexpr float UP_TOP_LIFT = 0.5f * PIXEL_HEIGHT;
+    constexpr float RIGHT_TOP_LIFT = 0.75f * PIXEL_HEIGHT;
     
     return dlerp(
         openSmile, 
         circleMouth, 
-        -.5f, 
-        openSmile, 
+        -.5f + RIGHT_TOP_LIFT,
+        openSmile + UP_TOP_LIFT,
         uwumouth, 
         input.joystick2.x, input.joystick2.y);
 }
