@@ -115,6 +115,10 @@ void loop() {
   auto j1target = Hardware::readJoystick(1);
   auto j2target = Hardware::readJoystick(0);
 
+  bool f2 = input.faceButtons[2];
+  bool f3 = input.faceButtons[3];
+  bool f6 = input.faceButtons[6];
+
   j1target.x = roundf(j1target.x * 15.0f) / 15.0f;
   j1target.y = roundf(j1target.y * 15.0f) / 15.0f;
 
@@ -127,12 +131,13 @@ void loop() {
   input.joystick2 = joyConvert(j2current);
   input.faceButtons[0] = Hardware::readFaceButton(Hardware::FaceButton::Four);
   input.faceButtons[1] = Hardware::readFaceButton(Hardware::FaceButton::Three);
-  bool f2 = input.faceButtons[2];
-  bool f3 = input.faceButtons[3];
-  bool f6 = input.faceButtons[6];
   input.faceButtons[2] = Hardware::readFaceButton(Hardware::FaceButton::Two);
   input.faceButtons[3] = Hardware::readFaceButton(Hardware::FaceButton::One);
+  input.faceButtons[4] = Hardware::readFaceButton(Hardware::FaceButton::Five);
+  input.faceButtons[5] = Hardware::readFaceButton(Hardware::FaceButton::Six);
   input.faceButtons[6] = Hardware::readFaceButton(Hardware::FaceButton::Seven);
+  input.timeSeconds = static_cast<float>(Hardware::millis()) * 0.001f;
+
   if (input.faceButtons[2] && !f2) {
     if (input.faceButtons[3]) {
         pupstate = 1.0f;
@@ -150,9 +155,6 @@ void loop() {
   if (input.faceButtons[6] && !f6) {
     pupstate = 3.0f;
   }
-  input.faceButtons[4] = Hardware::readFaceButton(Hardware::FaceButton::Five);
-  input.faceButtons[5] = Hardware::readFaceButton(Hardware::FaceButton::Six);
-  input.timeSeconds = static_cast<float>(Hardware::millis()) * 0.001f;
 
 
   float _5_6_target = input.faceButtons[4] ? (input.faceButtons[5] ? 2.0f : 1.0f) : (input.faceButtons[5] ? 3.0f : 0.0f);

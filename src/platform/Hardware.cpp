@@ -207,6 +207,31 @@ SDL_Scancode keyboardButtonFor(FaceButton button) {
   return SDL_SCANCODE_UNKNOWN;
 }
 
+int rawButtonIndexFor(FaceButton button) {
+#if defined(__linux__)
+  // The Adaptive Joystick's Linux HID driver exposes the physical controls in
+  // a different order than Windows. Normalize them here so FaceButton retains
+  // the same physical X1-X6/click meaning on both platforms.
+  switch (button) {
+    case FaceButton::One: return 2;    // X3
+    case FaceButton::Two: return 3;    // X4
+    case FaceButton::Three: return 4;  // X1
+    case FaceButton::Four: return 5;   // X2
+    case FaceButton::Five: return 1;   // X5
+    case FaceButton::Six: return 0;    // X6
+    case FaceButton::Seven: return 6;  // Joystick click
+  }
+  return -1;
+#else
+  if (button == FaceButton::Six) {
+    return -1;
+  }
+  return button == FaceButton::Seven
+      ? 8
+      : static_cast<int>(button);
+#endif
+}
+
 }  // namespace
 
 bool initialize() {
@@ -363,17 +388,19 @@ bool readFaceButton(FaceButton button) {
       ? SDL_GameControllerGetJoystick(controller)
       : rawJoystick;
 
+#if !defined(__linux__)
   if (button == FaceButton::Six) {
     // This controller exposes X6 as a click-like raw axis: positive is pressed
     // and negative is released.
     gamepadPressed = joystick != nullptr
         && SDL_JoystickNumAxes(joystick) > 4
         && SDL_JoystickGetAxis(joystick, 4) > 0;
-  } else if (joystick != nullptr) {
-    const int rawButtonIndex = button == FaceButton::Seven
-        ? 8
-        : static_cast<int>(button);
-    if (rawButtonIndex < SDL_JoystickNumButtons(joystick)) {
+  } else
+#endif
+  if (joystick != nullptr) {
+    const int rawButtonIndex = rawButtonIndexFor(button);
+    if (rawButtonIndex >= 0
+        && rawButtonIndex < SDL_JoystickNumButtons(joystick)) {
       gamepadPressed = SDL_JoystickGetButton(joystick, rawButtonIndex) != 0;
     } else if (controller != nullptr) {
       const SDL_GameControllerButton gamepadButton = controllerButtonFor(button);
