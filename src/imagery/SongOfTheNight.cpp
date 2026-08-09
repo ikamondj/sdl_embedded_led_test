@@ -587,9 +587,9 @@ ColorF eyeSample(
     };
 
 
-    const float scleraRadiusSqr = clerp4(.0005f, .0035f, 0.008f, 0.021f, input.pupState);
-    const float pupilRadiusSqr = clerp4(0.007f, 0.01f, 0.03f, 0.03f, input.pupState);
-    const float innerPupilRadiusSqr = clerp4(0.002f, 0.0001f, 0.009f, 0.001f, input.pupState);
+    const float scleraRadiusSqr = input.scleraRadiusSqr;
+    const float pupilRadiusSqr = input.pupilRadiusSqr;
+    const float innerPupilRadiusSqr = input.innerPupilRadiusSqr;
 
 
     const auto pupilPredicate =

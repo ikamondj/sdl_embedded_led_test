@@ -29,7 +29,9 @@ struct RenderInputs {
   std::array<bool, 7> faceButtons{};
   int antialiasingLevel = 1;
   bool disableBlink = false;
-  float pupState = 0;
+  float scleraRadiusSqr = .0005f;
+  float pupilRadiusSqr = .007f;
+  float innerPupilRadiusSqr = .002f;
 };
 
 enum class RasterPass : std::uint8_t {

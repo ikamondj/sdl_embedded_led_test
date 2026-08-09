@@ -10,7 +10,8 @@
 #include <thread>
 
 void setup();
-void loop();
+void loopSquareControls();
+void loopCircularControls();
 
 int main(int argc, char** argv) {
   bool desktopVisual = false;
@@ -21,6 +22,7 @@ int main(int argc, char** argv) {
   bool joystickLogging = false;
   bool vsync = false;
   bool windowedVisual = false;
+  bool circularControlsRequested = false;
   double frameRateLimit = 0.0;
   bool frameRateExplicit = false;
   for (int index = 1; index < argc; ++index) {
@@ -37,6 +39,8 @@ int main(int argc, char** argv) {
       inputLogging = true;
     } else if (argument == "-j") {
       joystickLogging = true;
+    } else if (argument == "-c") {
+      circularControlsRequested = true;
     } else if (argument == "-v") {
       vsync = true;
     } else if (argument == "-s") {
@@ -56,7 +60,7 @@ int main(int argc, char** argv) {
       }
     } else {
       std::cerr << "Usage: " << argv[0]
-                << " [-d] [-s] [-v] [-t] [-p] [-f] [-l] [-j] [-fps [number]]\n"
+                << " [-d] [-s] [-v] [-t] [-p] [-f] [-l] [-j] [-c] [-fps [number]]\n"
                 << "  -d  Use fullscreen SDL visual output.\n"
                 << "  -s  Use a resizable 64x32 SDL window.\n"
                 << "  -v  Enable SDL presentation VSync.\n"
@@ -65,6 +69,7 @@ int main(int argc, char** argv) {
                 << "  -f  Report average SDL presentation FPS once per second.\n"
                 << "  -l  Log raw button and non-stick axis changes.\n"
                 << "  -j  Log raw changes from the two main joystick axes.\n"
+                << "  -c  Use legacy circular four-state button smoothing.\n"
                 << "  -fps [N]  Limit to N FPS; omit N for uncapped.\n";
       return 2;
     }
@@ -74,6 +79,9 @@ int main(int argc, char** argv) {
       std::filesystem::absolute(argv[0]);
   const std::string maskPath =
       (executable.parent_path() / "raster-mask.bin").string();
+  void (*const runFrame)() = circularControlsRequested
+      ? &loopCircularControls
+      : &loopSquareControls;
 
   if (precomputeMask) {
     setThreadedRendering(true);
@@ -118,7 +126,7 @@ int main(int argc, char** argv) {
 
   while (Hardware::isRunning()) {
     const FrameClock::time_point frameStart = FrameClock::now();
-    loop();
+    runFrame();
     if (frameRateLimit > 0.0 && Hardware::isRunning()) {
       std::this_thread::sleep_until(frameStart + targetFrameDuration);
     }

@@ -117,3 +117,21 @@ inline float clerp4(
         )
     );
 }
+
+// Bilinear interpolation over the same four logical states as clerp4:
+// 0 = neither, 1 = first only, 2 = both, 3 = second only. Each button has
+// its own independently smoothed [0, 1] coordinate.
+inline float squareLerp4(
+    float _0,
+    float _1,
+    float _2,
+    float _3,
+    float first,
+    float second) noexcept
+{
+    first = std::clamp(first, 0.0f, 1.0f);
+    second = std::clamp(second, 0.0f, 1.0f);
+    const float withoutSecond = _0 + (_1 - _0) * first;
+    const float withSecond = _3 + (_2 - _3) * first;
+    return withoutSecond + (withSecond - withoutSecond) * second;
+}
