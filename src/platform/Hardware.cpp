@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <cstdint>
 #include <iostream>
 
@@ -21,6 +22,34 @@ SDL_JoystickID activeJoystickInstanceId = -1;
 bool running = false;
 bool inputLoggingEnabled = false;
 bool joystickLoggingEnabled = false;
+bool activeUsesAdaptiveLinuxProfile = false;
+
+bool deviceMatchesAdaptiveLinuxProfile(int deviceIndex) {
+#if defined(__linux__)
+  char guid[33]{};
+  SDL_JoystickGetGUIDString(
+      SDL_JoystickGetDeviceGUID(deviceIndex), guid, sizeof(guid));
+  if (std::strcmp(guid, "030000005e0400001a0b000000010000") != 0) {
+    return false;
+  }
+
+  SDL_Joystick* joystick = SDL_JoystickOpen(deviceIndex);
+  if (joystick == nullptr) {
+    return false;
+  }
+  const bool matches =
+      SDL_JoystickGetVendor(joystick) == 1118
+      && SDL_JoystickGetProduct(joystick) == 2842
+      && SDL_JoystickNumAxes(joystick) == 6
+      && SDL_JoystickNumButtons(joystick) == 11
+      && SDL_JoystickNumHats(joystick) == 1;
+  SDL_JoystickClose(joystick);
+  return matches;
+#else
+  static_cast<void>(deviceIndex);
+  return false;
+#endif
+}
 
 void logJoystickIdentity(SDL_Joystick* joystick) {
   if (joystick == nullptr
@@ -158,12 +187,16 @@ void closeActiveJoystick() {
   }
 
   activeJoystickInstanceId = -1;
+  activeUsesAdaptiveLinuxProfile = false;
 }
 
 bool openInputDeviceAtIndex(int deviceIndex) {
   if (controller != nullptr || rawJoystick != nullptr) {
     return false;
   }
+
+  const bool usesAdaptiveLinuxProfile =
+      deviceMatchesAdaptiveLinuxProfile(deviceIndex);
 
   if (SDL_IsGameController(deviceIndex)) {
     controller = SDL_GameControllerOpen(deviceIndex);
@@ -174,10 +207,14 @@ bool openInputDeviceAtIndex(int deviceIndex) {
 
     SDL_Joystick* joystick = SDL_GameControllerGetJoystick(controller);
     activeJoystickInstanceId = SDL_JoystickInstanceID(joystick);
+    activeUsesAdaptiveLinuxProfile = usesAdaptiveLinuxProfile;
 
     const char* name = SDL_GameControllerName(controller);
     std::cout << "Mapped gamepad connected: "
               << (name != nullptr ? name : "Unknown controller") << '\n';
+    if (activeUsesAdaptiveLinuxProfile) {
+      std::cout << "  Using stable Linux Adaptive Joystick profile.\n";
+    }
     logJoystickIdentity(joystick);
     return true;
   }
@@ -189,9 +226,13 @@ bool openInputDeviceAtIndex(int deviceIndex) {
   }
 
   activeJoystickInstanceId = SDL_JoystickInstanceID(rawJoystick);
+  activeUsesAdaptiveLinuxProfile = usesAdaptiveLinuxProfile;
   const char* name = SDL_JoystickName(rawJoystick);
   std::cout << "Unmapped joystick connected using raw fallback: "
             << (name != nullptr ? name : "Unknown joystick") << '\n';
+  if (activeUsesAdaptiveLinuxProfile) {
+    std::cout << "  Using stable Linux Adaptive Joystick profile.\n";
+  }
 #if defined(__linux__)
   std::cout << "  Raw mapping: axes 0/1 for the mouth; axis 2=X6.\n";
 #else
@@ -207,6 +248,14 @@ void openFirstAvailableInputDevice() {
   }
 
   const int joystickCount = SDL_NumJoysticks();
+#if defined(__linux__)
+  for (int index = 0; index < joystickCount; ++index) {
+    if (deviceMatchesAdaptiveLinuxProfile(index)
+        && openInputDeviceAtIndex(index)) {
+      return;
+    }
+  }
+#endif
   for (int index = 0; index < joystickCount; ++index) {
     if (openInputDeviceAtIndex(index)) {
       return;
@@ -311,19 +360,23 @@ SDL_Scancode keyboardButtonFor(FaceButton button) {
 
 int rawButtonIndexFor(FaceButton button) {
 #if defined(__linux__)
-  // The Adaptive Joystick's Linux HID driver exposes the physical controls in
-  // a different order than Windows. Normalize them here so FaceButton retains
-  // the same physical X1-X6/click meaning on both platforms.
-  switch (button) {
-    case FaceButton::One: return 2;    // X3
-    case FaceButton::Two: return 3;    // X4
-    case FaceButton::Three: return 4;  // X1
-    case FaceButton::Four: return 5;   // X2
-    case FaceButton::Five: return 1;   // X5
-    case FaceButton::Six: return -1;   // X6 is axis 2
-    case FaceButton::Seven: return 6;  // Joystick click
+  if (activeUsesAdaptiveLinuxProfile) {
+    switch (button) {
+      case FaceButton::One: return 0;    // X3
+      case FaceButton::Two: return 1;    // X4
+      case FaceButton::Three: return 2;  // X1
+      case FaceButton::Four: return 3;   // X2
+      case FaceButton::Five: return 4;   // X5
+      case FaceButton::Six: return -1;   // X6 is axis 2
+      case FaceButton::Seven: return 9;  // Joystick click
+    }
   }
-  return -1;
+  if (button == FaceButton::Six) {
+    return -1;
+  }
+  return button == FaceButton::Seven
+      ? 8
+      : static_cast<int>(button);
 #else
   if (button == FaceButton::Six) {
     return -1;
@@ -339,7 +392,7 @@ int rawAxisIndexFor(FaceButton button) {
     return -1;
   }
 #if defined(__linux__)
-  return 2;
+  return activeUsesAdaptiveLinuxProfile ? 2 : 4;
 #else
   return 4;
 #endif
@@ -400,7 +453,14 @@ void poll() {
         break;
 
       case SDL_JOYDEVICEADDED:
-        if (controller == nullptr && rawJoystick == nullptr) {
+        if (deviceMatchesAdaptiveLinuxProfile(event.jdevice.which)
+            && !activeUsesAdaptiveLinuxProfile) {
+          if (controller != nullptr || rawJoystick != nullptr) {
+            std::cout << "Preferred Adaptive Joystick connected; switching input device.\n";
+            closeActiveJoystick();
+          }
+          openInputDeviceAtIndex(event.jdevice.which);
+        } else if (controller == nullptr && rawJoystick == nullptr) {
           openInputDeviceAtIndex(event.jdevice.which);
         }
         break;

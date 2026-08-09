@@ -57,7 +57,9 @@ change from axis 4 onward. The two main sticks on axes 0–3 are excluded:
 ```
 
 Add `-j` to log changes from the two main joystick axes as well. Diagnostic
-mode also prints the active device GUID, USB IDs, and input counts:
+mode also enumerates every SDL joystick interface and prints its GUID, USB
+IDs, serial, device path, capability counts, and controller mapping when those
+fields are available:
 
 ```powershell
 .\build\bin\Hub75Simulator.exe -l -j
